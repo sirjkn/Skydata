@@ -3,7 +3,7 @@
  * 
  * This module provides ultra-aggressive real-time syncing:
  * - Syncs on every action (add, edit, delete)
- * - Syncs every 5 seconds in the background
+ * - Syncs every 30 seconds in the background
  * - Syncs on page load, refresh, and settings change
  * 
  * This ensures data is ALWAYS synchronized with Supabase Cloud.
@@ -130,7 +130,7 @@ export const quickUploadSync = async (): Promise<void> => {
 };
 
 /**
- * Start background sync that runs every 5 seconds
+ * Start background sync that runs every 30 seconds
  */
 let backgroundSyncInterval: number | null = null;
 
@@ -141,12 +141,12 @@ export const startBackgroundSync = (): void => {
   // Immediate initial sync
   bidirectionalSync();
 
-  // Start interval for every 5 seconds
+  // Start interval for every 30 seconds
   backgroundSyncInterval = setInterval(() => {
     if (dataService.isSupabaseEnabled()) {
       bidirectionalSync();
     }
-  }, 5000); // 5 seconds
+  }, 30000); // 30 seconds
 
   // Listen for manual full sync triggers (e.g., after settings save)
   const handleFullSyncTrigger = () => {
@@ -157,7 +157,7 @@ export const startBackgroundSync = (): void => {
 
   window.addEventListener('triggerFullSync', handleFullSyncTrigger);
 
-  console.log('🔁 Background sync started (every 5 seconds)');
+  console.log('🔁 Background sync started (every 30 seconds)');
 };
 
 /**

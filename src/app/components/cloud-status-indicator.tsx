@@ -9,7 +9,7 @@ import { addSyncListener, removeSyncListener } from '../lib/aggressive-sync-mana
  * Displays a badge indicating:
  * - Cloud storage (Supabase) or local storage
  * - Real-time sync status (syncing, success, error)
- * - Background sync every 5 seconds
+ * - Background sync every 30 seconds
  */
 export function CloudStatusIndicator() {
   const [cloudMode, setCloudMode] = useState(false);

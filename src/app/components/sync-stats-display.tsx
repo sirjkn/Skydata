@@ -108,7 +108,7 @@ export function SyncStatsDisplay() {
 
       <div className="mt-3 pt-3 border-t border-gray-200">
         <p className="text-xs text-gray-600 text-center">
-          🔄 Auto-sync every 5 seconds
+          🔄 Auto-sync every 30 seconds
         </p>
       </div>
     </div>

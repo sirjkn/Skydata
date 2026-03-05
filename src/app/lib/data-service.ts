@@ -25,7 +25,7 @@ const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
     };
     
     // Increase timeout for sync operations which can take longer with large datasets
-    const timeoutMs = endpoint.includes('/sync/') ? 120000 : 30000; // 2 minutes for sync, 30s for others
+    const timeoutMs = endpoint.includes('/sync/') ? 180000 : 30000; // 3 minutes for sync, 30s for others
     
     const response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
@@ -429,14 +429,22 @@ export const syncToSupabase = async (): Promise<any> => {
     const settings = JSON.parse(localStorage.getItem('skyway_settings') || '{}');
     const activityLogs = JSON.parse(localStorage.getItem('skyway_activity_logs') || '[]');
     
+    const totalItems = properties.length + customers.length + bookings.length + payments.length + activityLogs.length;
+    
     // Log data sizes for debugging
-    console.log('Syncing data to Supabase:', {
+    console.log('🔄 Syncing data to Supabase:', {
       properties: properties.length,
       customers: customers.length,
       bookings: bookings.length,
       payments: payments.length,
-      activityLogs: activityLogs.length
+      activityLogs: activityLogs.length,
+      totalItems
     });
+    
+    // For very large datasets (>100 total items), warn user it may take time
+    if (totalItems > 100) {
+      console.log('⚠️ Large dataset detected. This may take 1-2 minutes...');
+    }
     
     const result = await fetchWithAuth('/sync/upload', {
       method: 'POST',
@@ -452,9 +460,10 @@ export const syncToSupabase = async (): Promise<any> => {
       }),
     });
     
+    console.log('✅ Sync completed successfully');
     return result;
   } catch (error: any) {
-    console.error('Sync to Supabase failed:', error);
+    console.error('❌ Sync to Supabase failed:', error);
     throw new Error(`Failed to sync data: ${error.message || 'Unknown error'}`);
   }
 };

@@ -29,7 +29,11 @@ const supabase = createClient(
 
 // Health check endpoint
 app.get("/make-server-6a712830/health", (c) => {
-  return c.json({ status: "ok" });
+  return c.json({ 
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    version: "3.0"
+  });
 });
 
 // Auth middleware for protected routes
@@ -552,114 +556,74 @@ app.post("/make-server-6a712830/sync/upload", async (c) => {
       activityLogs: activityLogs?.length || 0
     });
     
-    // Process all sync operations in parallel with chunking for large datasets
-    const syncPromises = [];
-    const CHUNK_SIZE = 50; // Process 50 items at a time
+    const CHUNK_SIZE = 20; // Smaller chunks for better reliability
+    const BATCH_PARALLEL = 2; // Process 2 chunks at a time to avoid overwhelming
     
-    // Sync properties using batch operation with chunking
-    if (properties && Array.isArray(properties) && properties.length > 0) {
-      const propertyChunks = chunkArray(properties, CHUNK_SIZE);
-      console.log(`Processing ${properties.length} properties in ${propertyChunks.length} chunks`);
+    // Helper to process array in batches with controlled parallelism
+    const processBatches = async (items: any[], prefix: string, label: string) => {
+      if (!items || items.length === 0) return;
       
-      for (const chunk of propertyChunks) {
-        const keys = chunk.map(p => `property:${p.id}`);
-        syncPromises.push(
-          kv.mset(keys, chunk)
-            .then(() => console.log(`✅ Synced ${chunk.length} properties`))
-            .catch(err => console.error('Error syncing properties chunk:', err))
-        );
-      }
-    }
-    
-    // Sync customers using batch operation with chunking
-    if (customers && Array.isArray(customers) && customers.length > 0) {
-      const customerChunks = chunkArray(customers, CHUNK_SIZE);
-      console.log(`Processing ${customers.length} customers in ${customerChunks.length} chunks`);
+      const chunks = chunkArray(items, CHUNK_SIZE);
+      console.log(`📦 Processing ${items.length} ${label} in ${chunks.length} chunks (${CHUNK_SIZE} items per chunk)`);
       
-      for (const chunk of customerChunks) {
-        const keys = chunk.map(c => `customer:${c.id}`);
-        syncPromises.push(
-          kv.mset(keys, chunk)
-            .then(() => console.log(`✅ Synced ${chunk.length} customers`))
-            .catch(err => console.error('Error syncing customers chunk:', err))
-        );
-      }
-    }
-    
-    // Sync bookings using batch operation with chunking
-    if (bookings && Array.isArray(bookings) && bookings.length > 0) {
-      const bookingChunks = chunkArray(bookings, CHUNK_SIZE);
-      console.log(`Processing ${bookings.length} bookings in ${bookingChunks.length} chunks`);
+      let processedCount = 0;
       
-      for (const chunk of bookingChunks) {
-        const keys = chunk.map(b => `booking:${b.id}`);
-        syncPromises.push(
-          kv.mset(keys, chunk)
-            .then(() => console.log(`✅ Synced ${chunk.length} bookings`))
-            .catch(err => console.error('Error syncing bookings chunk:', err))
+      // Process chunks in batches of BATCH_PARALLEL
+      for (let i = 0; i < chunks.length; i += BATCH_PARALLEL) {
+        const batchChunks = chunks.slice(i, i + BATCH_PARALLEL);
+        const batchNumber = Math.floor(i / BATCH_PARALLEL) + 1;
+        const totalBatches = Math.ceil(chunks.length / BATCH_PARALLEL);
+        
+        console.log(`   Batch ${batchNumber}/${totalBatches} for ${label}...`);
+        
+        await Promise.all(
+          batchChunks.map(async (chunk) => {
+            const keys = chunk.map((item: any) => `${prefix}:${item.id}`);
+            try {
+              await kv.mset(keys, chunk);
+              processedCount += chunk.length;
+              console.log(`   ✅ Synced ${chunk.length} ${label} (${processedCount}/${items.length})`);
+            } catch (err) {
+              console.error(`   ❌ Error syncing ${label} chunk:`, err);
+              throw err; // Re-throw to fail the entire sync
+            }
+          })
         );
+        
+        // Small delay between batches to prevent overwhelming the system
+        if (i + BATCH_PARALLEL < chunks.length) {
+          await new Promise(resolve => setTimeout(resolve, 100)); // 100ms pause
+        }
       }
-    }
-    
-    // Sync payments using batch operation with chunking
-    if (payments && Array.isArray(payments) && payments.length > 0) {
-      const paymentChunks = chunkArray(payments, CHUNK_SIZE);
-      console.log(`Processing ${payments.length} payments in ${paymentChunks.length} chunks`);
       
-      for (const chunk of paymentChunks) {
-        const keys = chunk.map(p => `payment:${p.id}`);
-        syncPromises.push(
-          kv.mset(keys, chunk)
-            .then(() => console.log(`✅ Synced ${chunk.length} payments`))
-            .catch(err => console.error('Error syncing payments chunk:', err))
-        );
-      }
-    }
+      console.log(`✅ Completed syncing all ${processedCount} ${label}`);
+    };
     
-    // Sync activity logs using batch operation with chunking
-    if (activityLogs && Array.isArray(activityLogs) && activityLogs.length > 0) {
-      const logChunks = chunkArray(activityLogs, CHUNK_SIZE);
-      console.log(`Processing ${activityLogs.length} activity logs in ${logChunks.length} chunks`);
-      
-      for (const chunk of logChunks) {
-        const keys = chunk.map(l => `activity-log:${l.id}`);
-        syncPromises.push(
-          kv.mset(keys, chunk)
-            .then(() => console.log(`✅ Synced ${chunk.length} activity logs`))
-            .catch(err => console.error('Error syncing activity logs chunk:', err))
-        );
-      }
-    }
+    // Process each data type sequentially with controlled parallelism
+    await processBatches(properties, 'property', 'properties');
+    await processBatches(customers, 'customer', 'customers');
+    await processBatches(bookings, 'booking', 'bookings');
+    await processBatches(payments, 'payment', 'payments');
+    await processBatches(activityLogs, 'activity-log', 'activity logs');
     
-    // Sync categories
+    // Sync single-value items
     if (categories) {
-      syncPromises.push(
-        kv.set('app:categories', categories)
-          .then(() => console.log(`✅ Synced categories`))
-          .catch(err => console.error('Error syncing categories:', err))
-      );
+      console.log('📦 Syncing categories...');
+      await kv.set('app:categories', categories);
+      console.log('✅ Synced categories');
     }
     
-    // Sync features
     if (features) {
-      syncPromises.push(
-        kv.set('app:features', features)
-          .then(() => console.log(`✅ Synced features`))
-          .catch(err => console.error('Error syncing features:', err))
-      );
+      console.log('📦 Syncing features...');
+      await kv.set('app:features', features);
+      console.log('✅ Synced features');
     }
     
-    // Sync settings
     if (settings) {
-      syncPromises.push(
-        kv.set('app:settings', settings)
-          .then(() => console.log(`✅ Synced settings`))
-          .catch(err => console.error('Error syncing settings:', err))
-      );
+      console.log('📦 Syncing settings...');
+      await kv.set('app:settings', settings);
+      console.log('✅ Synced settings');
     }
-    
-    // Wait for all sync operations to complete
-    await Promise.all(syncPromises);
     
     console.log('✅ All data synced successfully to Supabase');
     
@@ -674,9 +638,16 @@ app.post("/make-server-6a712830/sync/upload", async (c) => {
         activityLogs: activityLogs?.length || 0
       }
     });
-  } catch (error) {
-    console.error('Error syncing data to Supabase:', error);
-    return c.json({ error: `Failed to sync data: ${error.message}` }, 500);
+  } catch (error: any) {
+    console.error('❌ Error syncing data to Supabase:', error);
+    
+    // Provide detailed error information
+    return c.json({ 
+      success: false,
+      error: `Failed to sync data: ${error?.message || 'Unknown error'}`,
+      details: error?.stack || '',
+      timestamp: new Date().toISOString()
+    }, 500);
   }
 });
 

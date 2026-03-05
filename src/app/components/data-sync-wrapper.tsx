@@ -7,7 +7,7 @@ import { startBackgroundSync, stopBackgroundSync, syncOnLoad } from '../lib/aggr
  * 
  * This component:
  * - Syncs data on every page load/refresh
- * - Runs background sync every 5 seconds
+ * - Runs background sync every 30 seconds
  * - Monitors Supabase mode changes and reloads when toggled
  * - Ensures data is ALWAYS synchronized with the cloud
  */
@@ -26,7 +26,7 @@ export function DataSyncWrapper({ children }: { children: React.ReactNode }) {
     // Sync immediately when page loads
     syncOnLoad();
     
-    // ===== START BACKGROUND SYNC EVERY 5 SECONDS =====
+    // ===== START BACKGROUND SYNC EVERY 30 SECONDS =====
     startBackgroundSync();
     
     // Check if Supabase mode changed

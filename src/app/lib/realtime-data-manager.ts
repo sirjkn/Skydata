@@ -8,7 +8,7 @@
  * 
  * AGGRESSIVE SYNC MODE:
  * - Every operation triggers immediate bidirectional sync
- * - Background sync runs every 5 seconds
+ * - Background sync runs every 30 seconds
  * - Data is always synchronized with cloud
  */
 

@@ -830,37 +830,37 @@ export function Settings() {
         </header>
 
         {/* Settings Content */}
-        <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-[#FAF4EC] via-[#f5ede3] to-[#ebe2d5]">
+        <main className="flex-1 overflow-auto p-3 bg-gradient-to-br from-[#FAF4EC] via-[#f5ede3] to-[#ebe2d5]">
 
         {/* Creative Page Header - Reduced by 30% */}
-        <div className="mb-8 relative overflow-hidden">
+        <div className="mb-4 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-[#6B7F39]/10 via-[#36454F]/10 to-[#6B7F39]/10 rounded-3xl"></div>
           <div className="absolute top-0 right-0 w-64 h-64 bg-[#6B7F39]/5 rounded-full blur-3xl"></div>
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#36454F]/5 rounded-full blur-3xl"></div>
           
-          <div className="relative p-6 md:p-7 rounded-3xl border-2 border-[#6B7F39]/20 bg-white/70 backdrop-blur-md shadow-2xl">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#6B7F39] to-[#36454F] flex items-center justify-center shadow-xl transform hover:scale-110 transition-transform duration-300">
-                <SettingsIcon className="w-7 h-7 text-white animate-spin-slow" style={{ animationDuration: '8s' }} />
+          <div className="relative p-3 md:p-4 rounded-2xl border border-[#6B7F39]/20 bg-white/70 backdrop-blur-md shadow-lg">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#6B7F39] to-[#36454F] flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform duration-300">
+                <SettingsIcon className="w-4 h-4 text-white animate-spin-slow" style={{ animationDuration: '8s' }} />
               </div>
               <div className="flex-1">
-                <h1 className="text-3xl md:text-4xl font-bold text-[#36454F] mb-2 bg-clip-text text-transparent bg-gradient-to-r from-[#36454F] to-[#6B7F39]">
+                <h1 className="text-xl md:text-2xl font-bold text-[#36454F] mb-1 bg-clip-text text-transparent bg-gradient-to-r from-[#36454F] to-[#6B7F39]">
                   Settings Center
                 </h1>
-                <p className="text-gray-600 text-base">Configure and manage your Skyway Suites platform</p>
+                <p className="text-gray-600 text-xs">Configure and manage your Skyway Suites platform</p>
               </div>
               
               {/* Quick Stats */}
-              <div className="flex gap-3">
-                <div className="bg-gradient-to-br from-[#6B7F39] to-[#5a6930] rounded-2xl p-3 text-white shadow-lg">
-                  <Users className="w-5 h-5 mb-1 opacity-80" />
-                  <p className="text-2xl font-bold">{stats.totalUsers}</p>
-                  <p className="text-xs opacity-80">Total Users</p>
+              <div className="flex gap-2">
+                <div className="bg-gradient-to-br from-[#6B7F39] to-[#5a6930] rounded-xl p-2 text-white shadow-md">
+                  <Users className="w-3 h-3 mb-0.5 opacity-80" />
+                  <p className="text-lg font-bold">{stats.totalUsers}</p>
+                  <p className="text-[10px] opacity-80">Total Users</p>
                 </div>
-                <div className="bg-gradient-to-br from-[#36454F] to-[#2a3640] rounded-2xl p-3 text-white shadow-lg">
-                  <CheckCircle2 className="w-5 h-5 mb-1 opacity-80" />
-                  <p className="text-2xl font-bold">{dbSettings.dbType === 'local' ? 'Local' : 'Remote'}</p>
-                  <p className="text-xs opacity-80">Database</p>
+                <div className="bg-gradient-to-br from-[#36454F] to-[#2a3640] rounded-xl p-2 text-white shadow-md">
+                  <CheckCircle2 className="w-3 h-3 mb-0.5 opacity-80" />
+                  <p className="text-lg font-bold">{dbSettings.dbType === 'local' ? 'Local' : 'Remote'}</p>
+                  <p className="text-[10px] opacity-80">Database</p>
                 </div>
               </div>
             </div>
@@ -868,22 +868,22 @@ export function Settings() {
         </div>
 
         {/* Main Layout with Sidebar */}
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-col lg:flex-row gap-3">
           {/* Creative Sidebar */}
-          <aside className="lg:w-72 flex-shrink-0">
-            <div className="bg-white rounded-3xl shadow-2xl border-2 border-gray-100 overflow-hidden sticky top-4">
+          <aside className="lg:w-56 flex-shrink-0">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden sticky top-4">
               {/* Sidebar Header */}
-              <div className="p-6 bg-gradient-to-br from-[#6B7F39] to-[#36454F] relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+              <div className="p-3 bg-gradient-to-br from-[#6B7F39] to-[#36454F] relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+                <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full -ml-8 -mb-8"></div>
                 <div className="relative">
-                  <h3 className="text-white font-bold text-xl mb-1">Navigation</h3>
-                  <p className="text-white/70 text-sm">Select a module</p>
+                  <h3 className="text-white font-bold text-base mb-0.5">Navigation</h3>
+                  <p className="text-white/70 text-xs">Select a module</p>
                 </div>
               </div>
 
               {/* Navigation Items */}
-              <nav className="p-4 space-y-2">
+              <nav className="p-2 space-y-1">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -895,23 +895,23 @@ export function Settings() {
                         isActive ? 'transform scale-105' : ''
                       }`}
                     >
-                      <div className={`relative flex items-center gap-4 px-5 py-4 rounded-2xl font-medium transition-all duration-300 ${
+                      <div className={`relative flex items-center gap-2 px-3 py-2 rounded-xl font-medium transition-all duration-300 ${
                         isActive
-                          ? `bg-gradient-to-r ${tab.color} text-white shadow-lg`
-                          : `${tab.bgColor} ${tab.textColor} hover:shadow-md`
+                          ? `bg-gradient-to-r ${tab.color} text-white shadow-md`
+                          : `${tab.bgColor} ${tab.textColor} hover:shadow-sm`
                       }`}>
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${
                           isActive ? 'bg-white/20' : 'bg-white'
                         } transition-all duration-300`}>
-                          <Icon className={`w-5 h-5 ${isActive ? 'text-white' : tab.textColor}`} />
+                          <Icon className={`w-3 h-3 ${isActive ? 'text-white' : tab.textColor}`} />
                         </div>
                         <div className="text-left flex-1">
-                          <p className={`font-semibold text-sm ${isActive ? 'text-white' : ''}`}>
+                          <p className={`font-semibold text-xs ${isActive ? 'text-white' : ''}`}>
                             {tab.label}
                           </p>
                         </div>
                         {isActive && (
-                          <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
                         )}
                       </div>
                     </button>
@@ -925,16 +925,16 @@ export function Settings() {
           {/* Main Content Area */}
           <div className="flex-1">
             {/* Content Header */}
-            <div className={`mb-6 p-6 rounded-2xl bg-gradient-to-r ${currentTabData?.color} text-white shadow-lg`}>
-              <div className="flex items-center gap-4">
+            <div className={`mb-3 p-3 rounded-xl bg-gradient-to-r ${currentTabData?.color} text-white shadow-md`}>
+              <div className="flex items-center gap-2">
                 {currentTabData && (
                   <>
-                    <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                      <currentTabData.icon className="w-6 h-6" />
+                    <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                      <currentTabData.icon className="w-4 h-4" />
                     </div>
                     <div>
-                      <h2 className="text-2xl font-bold">{currentTabData.label}</h2>
-                      <p className="text-white/80 text-sm">
+                      <h2 className="text-lg font-bold">{currentTabData.label}</h2>
+                      <p className="text-white/80 text-xs">
                         {activeTab === 'general' && 'Configure your company information and preferences'}
                         {activeTab === 'homepage' && `Managing ${stats.totalSlides} slides and home page content`}
                         {activeTab === 'users' && `Managing ${stats.totalUsers} users across the platform`}
@@ -948,42 +948,42 @@ export function Settings() {
             </div>
 
             {/* Tab Content */}
-            <div className="space-y-6">
+            <div className="space-y-3">
               {/* General Settings Tab */}
               {activeTab === 'general' && (
-                <div className="space-y-6">
+                <div className="space-y-3">
                   {/* Company Details Card */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                    <div className="p-6 bg-gradient-to-r from-blue-50 to-blue-100 border-b-2 border-blue-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
-                          <Building2 className="w-5 h-5 text-white" />
+                  <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                    <div className="p-3 bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
+                          <Building2 className="w-3 h-3 text-white" />
                         </div>
-                        <h3 className="text-xl font-bold text-blue-900">Company Details</h3>
+                        <h3 className="text-sm font-bold text-blue-900">Company Details</h3>
                       </div>
                     </div>
-                    <div className="p-6 space-y-6">
+                    <div className="p-3 space-y-3">
                       {/* Company Logo */}
-                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border-2 border-dashed border-gray-300">
-                        <label className="block text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                          <Upload className="w-4 h-4" />
+                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-3 border border-dashed border-gray-300">
+                        <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                          <Upload className="w-3 h-3" />
                           Company Logo
                         </label>
-                        <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-3">
                           {generalSettings.companyLogo ? (
                             <div className="relative group">
                               <img
                                 src={generalSettings.companyLogo}
                                 alt="Company Logo"
-                                className="w-24 h-24 object-contain border-2 border-gray-300 rounded-xl bg-white shadow-md"
+                                className="w-16 h-16 object-contain border border-gray-300 rounded-lg bg-white shadow-sm"
                               />
-                              <div className="absolute inset-0 bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <Edit className="w-6 h-6 text-white" />
+                              <div className="absolute inset-0 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Edit className="w-4 h-4 text-white" />
                               </div>
                             </div>
                           ) : (
-                            <div className="w-24 h-24 border-2 border-dashed border-gray-400 rounded-xl flex items-center justify-center bg-white">
-                              <Building2 className="w-8 h-8 text-gray-400" />
+                            <div className="w-16 h-16 border border-dashed border-gray-400 rounded-lg flex items-center justify-center bg-white">
+                              <Building2 className="w-5 h-5 text-gray-400" />
                             </div>
                           )}
                           <div>
@@ -1008,39 +1008,39 @@ export function Settings() {
                       </div>
 
                       {/* Company Info Grid - 2 Columns */}
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-2 gap-3">
                         {/* Company Name */}
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <Building2 className="w-4 h-4 text-blue-600" />
+                        <div className="space-y-1">
+                          <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
+                            <Building2 className="w-3 h-3 text-blue-600" />
                             Company Name
                           </label>
                           <Input
                             value={generalSettings.companyName}
                             onChange={(e) => setGeneralSettings({...generalSettings, companyName: e.target.value})}
                             placeholder="Enter company name"
-                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
+                            className="border border-gray-200 focus:border-blue-500 rounded-lg h-8 text-xs"
                           />
                         </div>
 
                         {/* Phone */}
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <Phone className="w-4 h-4 text-green-600" />
+                        <div className="space-y-1">
+                          <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
+                            <Phone className="w-3 h-3 text-green-600" />
                             Phone Number
                           </label>
                           <Input
                             value={generalSettings.companyPhone}
                             onChange={(e) => setGeneralSettings({...generalSettings, companyPhone: e.target.value})}
                             placeholder="+254 700 123 456"
-                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
+                            className="border border-gray-200 focus:border-blue-500 rounded-lg h-8 text-xs"
                           />
                         </div>
 
                         {/* Email */}
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <Mail className="w-4 h-4 text-red-600" />
+                        <div className="space-y-1">
+                          <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
+                            <Mail className="w-3 h-3 text-red-600" />
                             Email Address
                           </label>
                           <Input
@@ -1048,14 +1048,14 @@ export function Settings() {
                             value={generalSettings.companyEmail}
                             onChange={(e) => setGeneralSettings({...generalSettings, companyEmail: e.target.value})}
                             placeholder="info@skywaysuites.co.ke"
-                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
+                            className="border border-gray-200 focus:border-blue-500 rounded-lg h-8 text-xs"
                           />
                         </div>
 
                         {/* Website */}
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <Globe className="w-4 h-4 text-indigo-600" />
+                        <div className="space-y-1">
+                          <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
+                            <Globe className="w-3 h-3 text-indigo-600" />
                             Website
                           </label>
                           <Input
@@ -1063,35 +1063,35 @@ export function Settings() {
                             value={generalSettings.companyWebsite}
                             onChange={(e) => setGeneralSettings({...generalSettings, companyWebsite: e.target.value})}
                             placeholder="https://skywaysuites.co.ke"
-                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
+                            className="border border-gray-200 focus:border-blue-500 rounded-lg h-8 text-xs"
                           />
                         </div>
 
                         {/* Address */}
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <MapPin className="w-4 h-4 text-purple-600" />
+                        <div className="space-y-1">
+                          <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
+                            <MapPin className="w-3 h-3 text-purple-600" />
                             Address
                           </label>
                           <Input
                             value={generalSettings.companyAddress}
                             onChange={(e) => setGeneralSettings({...generalSettings, companyAddress: e.target.value})}
                             placeholder="Nairobi, Kenya"
-                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
+                            className="border border-gray-200 focus:border-blue-500 rounded-lg h-8 text-xs"
                           />
                         </div>
 
                         {/* Currency */}
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <DollarSign className="w-4 h-4 text-yellow-600" />
+                        <div className="space-y-1">
+                          <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
+                            <DollarSign className="w-3 h-3 text-yellow-600" />
                             Currency
                           </label>
                           <Select
                             value={generalSettings.currency}
                             onValueChange={(value) => setGeneralSettings({...generalSettings, currency: value})}
                           >
-                            <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12">
+                            <SelectTrigger className="border border-gray-200 focus:border-blue-500 rounded-lg h-8 text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1105,12 +1105,12 @@ export function Settings() {
                       </div>
 
                       {/* Save Button */}
-                      <div className="pt-4 border-t-2 border-gray-100">
+                      <div className="pt-2 border-t border-gray-100">
                         <Button 
                           onClick={handleSaveGeneralSettings}
-                          className="w-full md:w-auto bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-6 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                          className="w-full md:w-auto bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 text-xs"
                         >
-                          <Save className="w-5 h-5 mr-2" />
+                          <Save className="w-3 h-3 mr-1" />
                           Save General Settings
                         </Button>
                       </div>
@@ -1121,62 +1121,62 @@ export function Settings() {
 
               {/* Home Page Settings Tab */}
               {activeTab === 'homepage' && (
-                <div className="space-y-6">
+                <div className="space-y-3">
                   {/* Slideshow Management */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-indigo-50 to-indigo-100 border-b-2 border-indigo-200">
+                  <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+                    <div className="p-3 bg-gradient-to-r from-indigo-50 to-indigo-100 border-b border-indigo-200">
                       <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md">
-                            <Image className="w-5 h-5 text-white" />
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-sm">
+                            <Image className="w-3 h-3 text-white" />
                           </div>
                           <div>
-                            <h3 className="text-xl font-bold text-indigo-900">Slideshow Management</h3>
-                            <p className="text-sm text-indigo-700">{homePageSettings.slides.length} active slides</p>
+                            <h3 className="text-sm font-bold text-indigo-900">Slideshow Management</h3>
+                            <p className="text-xs text-indigo-700">{homePageSettings.slides.length} active slides</p>
                           </div>
                         </div>
                         <Button
                           onClick={handleAddSlide}
-                          className="bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828]"
+                          className="bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-xs py-1 px-2 h-auto"
                         >
-                          <Plus className="w-4 h-4 mr-2" />
+                          <Plus className="w-3 h-3 mr-1" />
                           Add Slide
                         </Button>
                       </div>
                     </div>
-                    <div className="p-6 space-y-4">
+                    <div className="p-3 space-y-2">
                       {homePageSettings.slides.map((slide, index) => (
                         <div
                           key={slide.id}
-                          className="group bg-gradient-to-r from-[#FAF4EC] to-[#f5ede3] rounded-2xl p-5 border-2 border-gray-200 hover:border-indigo-400 transition-all duration-300"
+                          className="group bg-gradient-to-r from-[#FAF4EC] to-[#f5ede3] rounded-xl p-2 border border-gray-200 hover:border-indigo-400 transition-all duration-300"
                         >
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white font-bold flex items-center justify-center shadow-md">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 text-white font-bold flex items-center justify-center shadow-sm text-xs">
                                 {index + 1}
                               </div>
                               <div>
-                                <p className="font-bold text-[#36454F] text-lg">{slide.title}</p>
-                                <p className="text-gray-600 text-sm">{slide.subtitle}</p>
+                                <p className="font-bold text-[#36454F] text-sm">{slide.title}</p>
+                                <p className="text-gray-600 text-xs">{slide.subtitle}</p>
                               </div>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-1">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleEditSlide(slide)}
-                                className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+                                className="border border-blue-500 text-blue-600 hover:bg-blue-50 h-auto py-1 px-2 text-xs"
                               >
-                                <Edit className="w-4 h-4 mr-1" />
+                                <Edit className="w-3 h-3 mr-0.5" />
                                 Edit
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleDeleteSlide(slide.id)}
-                                className="border-2 border-red-500 text-red-600 hover:bg-red-50"
+                                className="border border-red-500 text-red-600 hover:bg-red-50 h-auto py-1 px-2 text-xs"
                               >
-                                <Trash2 className="w-4 h-4 mr-1" />
+                                <Trash2 className="w-3 h-3 mr-0.5" />
                                 Delete
                               </Button>
                             </div>
@@ -1491,9 +1491,9 @@ export function Settings() {
                   <div className="bg-white rounded-2xl shadow-lg border-2 border-green-300 p-6">
                     <Button 
                       onClick={handleSaveHomePageSettings}
-                      className="w-full bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-bold py-6 px-8 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 text-lg"
+                      className="w-full bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-bold py-2 px-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 text-sm"
                     >
-                      <Save className="w-6 h-6 mr-3" />
+                      <Save className="w-3 h-3 mr-1" />
                       Save All Home Page Settings
                     </Button>
                   </div>
@@ -1502,21 +1502,21 @@ export function Settings() {
 
               {/* Users Settings Tab */}
               {activeTab === 'users' && (
-                <div className="space-y-6">
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
+                <div className="space-y-3">
+                  <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
                     {/* Header */}
-                    <div className="p-6 bg-gradient-to-r from-green-50 to-green-100 border-b-2 border-green-200">
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-md">
-                            <Users className="w-5 h-5 text-white" />
+                    <div className="p-3 bg-gradient-to-r from-green-50 to-green-100 border-b border-green-200">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-sm">
+                            <Users className="w-3 h-3 text-white" />
                           </div>
                           <div>
-                            <h3 className="text-xl font-bold text-green-900">User Management</h3>
-                            <p className="text-sm text-green-700">{users.length} registered users</p>
+                            <h3 className="text-sm font-bold text-green-900">User Management</h3>
+                            <p className="text-xs text-green-700">{users.length} registered users</p>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1">
                           <Button
                             onClick={() => {
                               setEditingUser(null);
@@ -1529,17 +1529,17 @@ export function Settings() {
                               });
                               setShowAddUserModal(true);
                             }}
-                            className="bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] shadow-md"
+                            className="bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] shadow-sm text-xs py-1 px-2 h-auto"
                           >
-                            <Plus className="w-4 h-4 mr-2" />
+                            <Plus className="w-3 h-3 mr-1" />
                             Add User
                           </Button>
                           <Button
                             onClick={() => setShowManageRolesModal(true)}
                             variant="outline"
-                            className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+                            className="border border-blue-500 text-blue-600 hover:bg-blue-50 text-xs py-1 px-2 h-auto"
                           >
-                            <Shield className="w-4 h-4 mr-2" />
+                            <Shield className="w-3 h-3 mr-1" />
                             Manage Roles
                           </Button>
                         </div>
@@ -1547,8 +1547,8 @@ export function Settings() {
                     </div>
 
                     {/* Users List */}
-                    <div className="p-6">
-                      <div className="space-y-4">
+                    <div className="p-3">
+                      <div className="space-y-2">
                         {users.length > 0 ? (
                           users.map((user, index) => (
                             <div
@@ -1657,29 +1657,29 @@ export function Settings() {
 
               {/* Database Settings Tab - Same as before, keeping it intact */}
               {activeTab === 'database' && (
-                <div className="space-y-6">
+                <div className="space-y-3">
                   {/* Supabase Cloud Mode Card */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-emerald-50 to-emerald-100 border-b-2 border-emerald-200">
+                  <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+                    <div className="p-3 bg-gradient-to-r from-emerald-50 to-emerald-100 border-b border-emerald-200">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-md">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm">
                             {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase ? (
-                              <Wifi className="w-5 h-5 text-white" />
+                              <Wifi className="w-3 h-3 text-white" />
                             ) : (
-                              <HardDrive className="w-5 h-5 text-white" />
+                              <HardDrive className="w-3 h-3 text-white" />
                             )}
                           </div>
                           <div>
-                            <h3 className="text-xl font-bold text-emerald-900">Cloud Storage Mode</h3>
-                            <p className="text-sm text-emerald-700">
+                            <h3 className="text-sm font-bold text-emerald-900">Cloud Storage Mode</h3>
+                            <p className="text-xs text-emerald-700">
                               {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase 
                                 ? '☁️ Cloud Mode Active - Data saved to Supabase' 
                                 : '💾 Local Mode Active - Data saved to browser'}
                             </p>
                           </div>
                         </div>
-                        <div className={`px-4 py-2 rounded-lg font-semibold text-sm ${
+                        <div className={`px-2 py-1 rounded-lg font-semibold text-xs ${
                           JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase 
                             ? 'bg-emerald-500 text-white' 
                             : 'bg-gray-200 text-gray-700'
@@ -1688,25 +1688,25 @@ export function Settings() {
                         </div>
                       </div>
                     </div>
-                    <div className="p-6">
-                      <div className="space-y-4">
-                        <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border-2 border-blue-200">
-                          <Info className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
-                          <div className="space-y-2">
-                            <p className="text-sm font-semibold text-blue-900">
+                    <div className="p-3">
+                      <div className="space-y-2">
+                        <div className="flex items-start gap-2 p-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                          <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div className="space-y-1">
+                            <p className="text-xs font-semibold text-blue-900">
                               🚀 Aggressive Real-Time Cloud Sync Enabled
                             </p>
-                            <ul className="text-sm text-blue-700 space-y-1 ml-4 list-disc">
+                            <ul className="text-xs text-blue-700 space-y-0.5 ml-3 list-disc">
                               <li><strong>Instant Sync:</strong> Every add/edit/delete syncs to cloud immediately</li>
                               <li><strong>Auto-Refresh:</strong> Data fetched on every page load, reload, and settings save</li>
-                              <li><strong>Background Sync:</strong> Bidirectional sync runs every 5 seconds automatically</li>
+                              <li><strong>Background Sync:</strong> Bidirectional sync runs every 30 seconds automatically</li>
                               <li><strong>Always Current:</strong> Your data is continuously synchronized with Supabase</li>
                               <li><strong>Multi-Device:</strong> Access updated data from any device in real-time</li>
                             </ul>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
+                        <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200">
                           <div className="flex items-center gap-3">
                             {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase ? (
                               <Wifi className="w-8 h-8 text-emerald-600" />
@@ -2241,9 +2241,9 @@ export function Settings() {
                       <div className="pt-4 border-t-2 border-gray-100">
                         <Button 
                           onClick={handleSaveDbSettings}
-                          className="w-full md:w-auto bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-6 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                          className="w-full md:w-auto bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 text-xs"
                         >
-                          <Save className="w-5 h-5 mr-2" />
+                          <Save className="w-3 h-3 mr-1" />
                           Save Database Settings
                         </Button>
                       </div>
@@ -2279,28 +2279,28 @@ export function Settings() {
 
               {/* SMS Integration Tab - Keeping as before */}
               {activeTab === 'sms' && (
-                <div className="space-y-6">
+                <div className="space-y-3">
                   {/* SMS Provider Card */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-orange-50 to-orange-100 border-b-2 border-orange-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
-                          <MessageSquare className="w-5 h-5 text-white" />
+                  <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+                    <div className="p-3 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-orange-200">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-sm">
+                          <MessageSquare className="w-3 h-3 text-white" />
                         </div>
-                        <h3 className="text-xl font-bold text-orange-900">SMS Provider</h3>
+                        <h3 className="text-sm font-bold text-orange-900">SMS Provider</h3>
                       </div>
                     </div>
-                    <div className="p-6 space-y-6">
+                    <div className="p-3 space-y-3">
                       {/* Provider Selection */}
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
                           Select Provider
                         </label>
                         <Select
                           value={smsProvider}
                           onValueChange={setSmsProvider}
                         >
-                          <SelectTrigger className="border-2 border-gray-200 focus:border-orange-500 rounded-xl h-12">
+                          <SelectTrigger className="border border-gray-200 focus:border-orange-500 rounded-lg h-8 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -2312,18 +2312,18 @@ export function Settings() {
 
                       {/* Africa's Talking Settings */}
                       {smsProvider === 'africastalking' && (
-                        <div className="space-y-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border-2 border-green-200">
-                          <div className="flex items-center gap-2 mb-4">
-                            <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center">
-                              <MessageSquare className="w-4 h-4 text-white" />
+                        <div className="space-y-2 bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3 border border-green-200">
+                          <div className="flex items-center gap-1 mb-2">
+                            <div className="w-5 h-5 rounded-md bg-green-600 flex items-center justify-center">
+                              <MessageSquare className="w-3 h-3 text-white" />
                             </div>
-                            <h4 className="font-bold text-green-900">Africa's Talking Settings</h4>
+                            <h4 className="font-bold text-green-900 text-xs">Africa's Talking Settings</h4>
                           </div>
 
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                <Shield className="w-4 h-4 text-green-600" />
+                          <div className="space-y-2">
+                            <div className="space-y-1">
+                              <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
+                                <Shield className="w-3 h-3 text-green-600" />
                                 API Key
                               </label>
                               <Input
@@ -2535,17 +2535,17 @@ export function Settings() {
                       <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t-2 border-gray-100">
                         <Button
                           onClick={handleSendCustomMessage}
-                          className="flex-1 bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-6 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                          className="flex-1 bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 text-xs"
                         >
-                          <Send className="w-5 h-5 mr-2" />
+                          <Send className="w-3 h-3 mr-1" />
                           Send Message
                         </Button>
                         <Button
                           onClick={handleSaveSmsSettings}
                           variant="outline"
-                          className="flex-1 border-2 border-blue-500 text-blue-600 hover:bg-blue-50 font-semibold py-6 px-8 rounded-xl"
+                          className="flex-1 border border-blue-500 text-blue-600 hover:bg-blue-50 font-semibold py-2 px-4 rounded-lg text-xs"
                         >
-                          <Save className="w-5 h-5 mr-2" />
+                          <Save className="w-3 h-3 mr-1" />
                           Save SMS Settings
                         </Button>
                       </div>
