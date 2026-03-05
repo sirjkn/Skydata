@@ -65,6 +65,7 @@ import {
   fetchPaymentsByBooking,
   createActivityLog
 } from '../../lib/supabaseData';
+import * as adminHelpers from '../lib/adminHelpers';
 
 // App version - keep consistent across all modules
 const APP_VERSION = '2.35';
@@ -475,14 +476,33 @@ export function AdminDashboard() {
     };
   }, []);
 
-  // Load all data from Supabase
+  // Load all data from Supabase or use demo data
   useEffect(() => {
-    if (!isOnline) {
-      console.log('⚠️ Offline - Cannot load data');
-      return;
-    }
-
     const loadAllData = async () => {
+      // Check if we're using demo accounts (offline mode)
+      const currentUser = getCurrentUser();
+      const isDemoMode = currentUser?.email === 'admin@skyway.com' || currentUser?.email === 'user@skyway.com';
+      
+      if (isDemoMode) {
+        console.log('⚠️ Demo mode detected - Using demo data instead of Supabase');
+        // Set empty demo data for now
+        setCategories(['Apartment', 'Villa', 'Townhouse', 'Studio', 'Penthouse']);
+        setFeatures(['WiFi', 'Parking', 'Pool', 'Gym', 'Security', 'Generator']);
+        setProperties([]);
+        setBookings([]);
+        setCustomers([]);
+        setPayments([]);
+        setActivityLogs([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      if (!isOnline) {
+        console.log('⚠️ Offline - Cannot load data');
+        setIsLoading(false);
+        return;
+      }
+
       try {
         console.log('📡 Loading Admin Dashboard data from Supabase...');
         
@@ -1209,49 +1229,43 @@ export function AdminDashboard() {
   };
 
   // Handle Add Property Submit
-  const handleAddPropertySubmit = () => {
+  const handleAddPropertySubmit = async () => {
     // Validate form
     if (!propertyForm.name || !propertyForm.category || !propertyForm.location || !propertyForm.price) {
       showModal('error', 'Missing Fields', 'Please fill in all required fields');
       return;
     }
 
-    try {
-      // Get existing properties
-      const existingProperties = JSON.parse(localStorage.getItem('skyway_properties') || '[]');
-      
-      // Create new property
-      const newProperty = {
-        id: Date.now(),
-        name: propertyForm.name,
-        category: propertyForm.category,
-        features: propertyForm.selectedFeatures,
-        location: propertyForm.location,
-        price: parseInt(propertyForm.price),
-        description: propertyForm.description,
-        beds: parseInt(propertyForm.beds) || 0,
-        baths: parseInt(propertyForm.baths) || 0,
-        area: parseInt(propertyForm.area) || 0,
-        photos: photos,
-        status: 'Active',
-        createdAt: new Date().toISOString()
-      };
+    // Check connection
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot create property. Please check your internet connection.');
+      return;
+    }
 
-      // Save to localStorage with error handling
-      const updatedProperties = [...existingProperties, newProperty];
-      
-      try {
-        localStorage.setItem('skyway_properties', JSON.stringify(updatedProperties));
-      } catch (storageError: any) {
-        if (storageError.name === 'QuotaExceededError') {
-          showModal('error', 'Storage Quota Exceeded', 'All images are compressed to WebP (max 50KB each), but you still need to:\n\n1. Reduce photos (current: ' + Object.values(photos).reduce((sum, arr) => sum + arr.length, 0) + ', recommended: 5-10)\n2. Delete old/unused properties\n3. Clear browser cache\n\nNote: Each photo is automatically optimized to ~50KB.');
-          return;
-        }
-        throw storageError;
-      }
+    try {
+      // Create new property via Supabase
+      const newProperty = await adminHelpers.addProperty(propertyForm, photos);
       
       // Update state to show new property immediately
-      setProperties(updatedProperties);
+      setProperties([...properties, newProperty]);
+      
+      // Log activity
+      const currentUser = getCurrentUser();
+      if (currentUser && parseInt(currentUser.id)) {
+        try {
+          await adminHelpers.logActivity(
+            parseInt(currentUser.id),
+            currentUser.name,
+            currentUser.role,
+            `Created property: ${propertyForm.name}`,
+            'create',
+            'property',
+            newProperty.id
+          );
+        } catch (logError) {
+          console.error('Failed to log activity:', logError);
+        }
+      }
 
       // Reset form
       setPropertyForm({
@@ -1283,72 +1297,48 @@ export function AdminDashboard() {
   };
 
   // Handle Edit Property Submit
-  const handleEditPropertySubmit = () => {
+  const handleEditPropertySubmit = async () => {
     // Validate form
     if (!propertyForm.name || !propertyForm.category || !propertyForm.location || !propertyForm.price) {
       showModal('error', 'Validation Error', 'Please fill in all required fields');
       return;
     }
 
-    try {
-      // Get existing properties
-      const existingProperties = JSON.parse(localStorage.getItem('skyway_properties') || '[]');
-      
-      // Update the property
-      const updatedProperties = existingProperties.map((prop: any) => {
-        if (prop.id === editingProperty.id) {
-          return {
-            ...prop,
-            name: propertyForm.name,
-            category: propertyForm.category,
-            features: propertyForm.selectedFeatures,
-            location: propertyForm.location,
-            price: parseInt(propertyForm.price),
-            description: propertyForm.description,
-            beds: parseInt(propertyForm.beds) || 0,
-            baths: parseInt(propertyForm.baths) || 0,
-            area: parseInt(propertyForm.area) || 0,
-            photos: photos,
-            updatedAt: new Date().toISOString()
-          };
-        }
-        return prop;
-      });
+    // Check connection
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot update property. Please check your internet connection.');
+      return;
+    }
 
-      // Save to localStorage with error handling
-      try {
-        localStorage.setItem('skyway_properties', JSON.stringify(updatedProperties));
-      } catch (storageError: any) {
-        if (storageError.name === 'QuotaExceededError') {
-          showModal('error', 'Storage Quota Exceeded', 'All images are compressed to WebP (max 50KB each), but you still need to:\n\n1. Reduce photos (current: ' + Object.values(photos).reduce((sum, arr) => sum + arr.length, 0) + ', recommended: 5-10)\n2. Delete old/unused properties\n3. Clear browser cache\n\nNote: Each photo is automatically optimized to ~50KB.');
-          return;
-        }
-        throw storageError;
-      }
+    try {
+      // Update property via Supabase
+      const updatedProperty = await adminHelpers.modifyProperty(editingProperty.id, propertyForm, photos);
       
-      // Update state to show updated property immediately
+      // Update state
+      const updatedProperties = properties.map(prop => 
+        prop.id === editingProperty.id ? updatedProperty : prop
+      );
       setProperties(updatedProperties);
       
+      // Log activity
+      const currentUser = getCurrentUser();
+      if (currentUser && parseInt(currentUser.id)) {
+        try {
+          await adminHelpers.logActivity(
+            parseInt(currentUser.id),
+            currentUser.name,
+            currentUser.role,
+            `Updated property: ${propertyForm.name}`,
+            'update',
+            'property',
+            editingProperty.id
+          );
+        } catch (logError) {
+          console.error('Failed to log activity:', logError);
+        }
+      }
+      
       // Reset form
-      setPropertyForm({
-        name: '',
-        category: '',
-        selectedFeatures: [],
-        location: '',
-        price: '',
-        description: '',
-        beds: '',
-        baths: '',
-        area: ''
-      });
-      setPhotos({
-        livingRoom: [],
-        bedroom: [],
-        bathroom: [],
-        dining: [],
-        others: []
-      });
-      setShowEditPropertyModal(false);
       setEditingProperty(null);
       
       // Show success message
@@ -1360,21 +1350,17 @@ export function AdminDashboard() {
   };
 
   // Handle Add Customer
-  const handleAddCustomer = () => {
+  const handleAddCustomer = async () => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot create customer. Please check your internet connection.');
+      return;
+    }
+    
     if (customerForm.name.trim()) {
-      const newCustomer = {
-        id: Date.now().toString(),
-        name: customerForm.name.trim(),
-        phone: customerForm.phone.trim(),
-        email: customerForm.email.trim(),
-        address: customerForm.address.trim(),
-        password: customerForm.password.trim(),
-        createdAt: new Date().toISOString()
-      };
-      
-      const updatedCustomers = [...customers, newCustomer];
-      setCustomers(updatedCustomers);
-      localStorage.setItem('skyway_customers', JSON.stringify(updatedCustomers));
+      try {
+        const createdCustomer = await adminHelpers.addCustomer(customerForm);
+        const updatedCustomers = [...customers, createdCustomer];
+        setCustomers(updatedCustomers);
       
       // Reset form
       setCustomerForm({
@@ -1384,26 +1370,40 @@ export function AdminDashboard() {
         address: '',
         password: ''
       });
-      setShowCustomerPassword(false);
-      setShowCustomerModal(false);
-      showModal('success', 'Success', 'Customer added successfully!');
+        setShowCustomerPassword(false);
+        setShowCustomerModal(false);
+        showModal('success', 'Success', 'Customer added successfully!');
+      } catch (error) {
+        console.error('Error adding customer:', error);
+        showModal('error', 'Error', 'Failed to add customer. Please try again.');
+      }
     }
   };
 
   // Handle Delete Customer
-  const handleDeleteCustomer = () => {
+  const handleDeleteCustomer = async () => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot delete customer. Please check your internet connection.');
+      return;
+    }
+    
     if (selectedCustomer) {
-      const updatedCustomers = customers.filter(c => c.id !== selectedCustomer.id);
-      setCustomers(updatedCustomers);
-      localStorage.setItem('skyway_customers', JSON.stringify(updatedCustomers));
-      setShowDeleteCustomerConfirm(false);
-      setSelectedCustomer(null);
-      showModal('success', 'Success', 'Customer deleted successfully!');
+      try {
+        await adminHelpers.removeCustomer(selectedCustomer.id);
+        const updatedCustomers = customers.filter(c => c.id !== selectedCustomer.id);
+        setCustomers(updatedCustomers);
+        setShowDeleteCustomerConfirm(false);
+        setSelectedCustomer(null);
+        showModal('success', 'Success', 'Customer deleted successfully!');
+      } catch (error) {
+        console.error('Error deleting customer:', error);
+        showModal('error', 'Error', 'Failed to delete customer. Please try again.');
+      }
     }
   };
 
   // Handle Add Booking
-  const handleAddBooking = () => {
+  const handleAddBooking = async () => {
     /**
      * ADD BOOKING FLOW - Complete Documentation
      * =========================================
@@ -1502,11 +1502,36 @@ export function AdminDashboard() {
       createdAt: new Date().toISOString()
     };
 
-    // Save to localStorage
-    const updatedBookings = [...bookings, newBooking];
-    localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
-    setBookings(updatedBookings);
-    setBookingsRefreshKey(prev => prev + 1);
+    // Check connection
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot create booking. Please check your internet connection.');
+      return;
+    }
+
+    // Save to Supabase
+    try {
+      const bookingData = {
+        customerId: parseInt(newBooking.customerId),
+        propertyId: parseInt(newBooking.propertyId),
+        checkIn: newBooking.checkIn,
+        checkOut: newBooking.checkOut,
+        totalAmount: newBooking.totalAmount,
+        amountPaid: 0,
+        paymentStatus: 'Not Paid',
+        status: newBooking.status,
+        paymentMode: '',
+        transactionId: '',
+        notes: ''
+      };
+      const createdBooking = await adminHelpers.addBooking(bookingData);
+      const updatedBookings = [...bookings, { ...newBooking, id: createdBooking.id }];
+      setBookings(updatedBookings);
+      setBookingsRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      showModal('error', 'Error', 'Failed to create booking. Please try again.');
+      return;
+    }
 
     // Log successful booking creation with all linked data
     console.log('✅ Booking Added Successfully:');
@@ -2229,15 +2254,26 @@ export function AdminDashboard() {
                                 <>
                                   <Button
                                     size="sm"
-                                    onClick={() => {
-                                      // Approve booking
-                                      const updatedBookings = bookings.map((b) =>
-                                        b.id === booking.id
-                                          ? { ...b, status: 'Confirmed' }
-                                          : b
-                                      );
-                                      setBookings(updatedBookings);
-                                      localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
+                                    onClick={async () => {
+                                      if (!checkConnection()) {
+                                        showModal('error', 'No Connection', 'Cannot approve booking. Please check your internet connection.');
+                                        return;
+                                      }
+                                      
+                                      try {
+                                        // Approve booking
+                                        await adminHelpers.modifyBooking(booking.id, { booking_status: 'Confirmed' });
+                                        const updatedBookings = bookings.map((b) =>
+                                          b.id === booking.id
+                                            ? { ...b, status: 'Confirmed' }
+                                            : b
+                                        );
+                                        setBookings(updatedBookings);
+                                      } catch (error) {
+                                        console.error('Error approving booking:', error);
+                                        showModal('error', 'Error', 'Failed to approve booking. Please try again.');
+                                        return;
+                                      }
                                       
                                       // SMS Notification Logic
                                       const smsSettings = JSON.parse(localStorage.getItem('skyway_sms_settings') || '{}');
@@ -2265,15 +2301,25 @@ export function AdminDashboard() {
                                     size="sm"
                                     onClick={() => {
                                       // Disapprove booking
-                                      showModal('confirm', 'Disapprove Booking', 'Are you sure you want to disapprove this booking? This will cancel the booking.', () => {
-                                        const updatedBookings = bookings.map((b) =>
-                                          b.id === booking.id
-                                            ? { ...b, status: 'Cancelled', cancelReason: 'Disapproved by admin' }
-                                            : b
-                                        );
-                                        setBookings(updatedBookings);
-                                        localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
-                                        showModal('success', 'Booking Disapproved', 'Booking disapproved and cancelled.');
+                                      showModal('confirm', 'Disapprove Booking', 'Are you sure you want to disapprove this booking? This will cancel the booking.', async () => {
+                                        if (!checkConnection()) {
+                                          showModal('error', 'No Connection', 'Cannot disapprove booking. Please check your internet connection.');
+                                          return;
+                                        }
+                                        
+                                        try {
+                                          await adminHelpers.modifyBooking(booking.id, { booking_status: 'Cancelled' });
+                                          const updatedBookings = bookings.map((b) =>
+                                            b.id === booking.id
+                                              ? { ...b, status: 'Cancelled', cancelReason: 'Disapproved by admin' }
+                                              : b
+                                          );
+                                          setBookings(updatedBookings);
+                                          showModal('success', 'Booking Disapproved', 'Booking disapproved and cancelled.');
+                                        } catch (error) {
+                                          console.error('Error disapproving booking:', error);
+                                          showModal('error', 'Error', 'Failed to disapprove booking. Please try again.');
+                                        }
                                       }, 'Disapprove', 'Cancel');
                                     }}
                                     className="hover:bg-white h-8 px-2 text-xs bg-red-500 hover:bg-red-600 text-white"
@@ -2826,10 +2872,19 @@ export function AdminDashboard() {
                     <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                       <span className="text-sm font-medium text-[#36454F]">{category}</span>
                       <button
-                        onClick={() => {
-                          const updatedCategories = categories.filter((_, i) => i !== index);
-                          setCategories(updatedCategories);
-                          localStorage.setItem('skyway_categories', JSON.stringify(updatedCategories));
+                        onClick={async () => {
+                          if (!checkConnection()) {
+                            showModal('error', 'No Connection', 'Cannot delete category. Please check your internet connection.');
+                            return;
+                          }
+                          try {
+                            await adminHelpers.removeCategory(categories[index]);
+                            const updatedCategories = categories.filter((_, i) => i !== index);
+                            setCategories(updatedCategories);
+                          } catch (error) {
+                            console.error('Error deleting category:', error);
+                            showModal('error', 'Error', 'Failed to delete category. Please try again.');
+                          }
                         }}
                         className="text-red-600 hover:text-red-700 p-1"
                       >
@@ -2900,10 +2955,19 @@ export function AdminDashboard() {
                     <div key={index} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                       <span className="text-sm font-medium text-[#36454F]">{feature}</span>
                       <button
-                        onClick={() => {
-                          const updatedFeatures = features.filter((_, i) => i !== index);
-                          setFeatures(updatedFeatures);
-                          localStorage.setItem('skyway_features', JSON.stringify(updatedFeatures));
+                        onClick={async () => {
+                          if (!checkConnection()) {
+                            showModal('error', 'No Connection', 'Cannot delete feature. Please check your internet connection.');
+                            return;
+                          }
+                          try {
+                            await adminHelpers.removeFeature(features[index]);
+                            const updatedFeatures = features.filter((_, i) => i !== index);
+                            setFeatures(updatedFeatures);
+                          } catch (error) {
+                            console.error('Error deleting feature:', error);
+                            showModal('error', 'Error', 'Failed to delete feature. Please try again.');
+                          }
                         }}
                         className="text-red-600 hover:text-red-700 p-1"
                       >
@@ -3730,29 +3794,46 @@ export function AdminDashboard() {
                     return booking;
                   });
 
-                  // Save updated bookings to localStorage
-                  setBookings(updatedBookings);
-                  localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
+                  // Check connection
+                  if (!checkConnection()) {
+                    showModal('error', 'No Connection', 'Cannot add payment. Please check your internet connection.');
+                    return;
+                  }
 
-                  // Also save to the separate payments store with full details
-                  const legacyPayment = {
-                    id: payment.id,
-                    bookingId: selectedBooking.id,
-                    propertyId: selectedBooking.propertyId,
-                    propertyName: selectedBooking.propertyName,
-                    customerId: selectedBooking.customerId,
-                    customerName: selectedBooking.customerName,
-                    customerEmail: selectedBooking.customerEmail,
-                    customerPhone: selectedBooking.customerPhone,
-                    totalAmount: parseFloat(paymentForm.totalAmount),
-                    paidAmount: parseFloat(paymentForm.paidAmount),
-                    balance: parseFloat(paymentForm.totalAmount) - parseFloat(paymentForm.paidAmount),
-                    paymentMode: paymentForm.paymentMode,
-                    transactionId: paymentForm.transactionId,
-                    createdAt: payment.date
-                  };
-                  const existingPayments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
-                  localStorage.setItem('skyway_payments', JSON.stringify([...existingPayments, legacyPayment]));
+                  try {
+                    // Save payment to Supabase
+                    const paymentData = {
+                      bookingId: selectedBooking.id,
+                      customerId: parseInt(selectedBooking.customerId),
+                      propertyId: parseInt(selectedBooking.propertyId),
+                      paidAmount: parseFloat(paymentForm.paidAmount),
+                      paymentMode: paymentForm.paymentMode,
+                      transactionId: paymentForm.transactionId || '',
+                      date: payment.date,
+                      mpesaCode: paymentForm.transactionId || '',
+                      notes: ''
+                    };
+                    const createdPayment = await adminHelpers.addPayment(paymentData);
+                    
+                    // Update booking in Supabase
+                    const bookingToUpdate = updatedBookings.find(b => b.id === selectedBooking.id);
+                    if (bookingToUpdate) {
+                      const totalPaid = (bookingToUpdate.payments || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+                      await adminHelpers.modifyBooking(bookingToUpdate.id, {
+                        amount_paid: totalPaid,
+                        payment_status: totalPaid >= bookingToUpdate.totalAmount ? 'Paid in Full' : 'Partial Payment',
+                        booking_status: totalPaid >= bookingToUpdate.totalAmount ? 'Confirmed' : bookingToUpdate.status
+                      });
+                    }
+
+                    // Update local state
+                    setBookings(updatedBookings);
+                    setPayments([...payments, createdPayment]);
+                  } catch (error) {
+                    console.error('Error adding payment:', error);
+                    showModal('error', 'Error', 'Failed to add payment. Please try again.');
+                    return;
+                  }
 
                   // Reset form
                   setPaymentForm({
@@ -3837,27 +3918,36 @@ export function AdminDashboard() {
 
             <div className="flex gap-3">
               <Button
-                onClick={() => {
+                onClick={async () => {
                   if (!cancelReason.trim()) {
                     showModal('error', 'Validation Error', 'Please provide a reason for cancellation');
                     return;
                   }
 
-                  // Update booking status to Cancelled
-                  const updatedBookings = bookings.map(b => 
-                    b.id === selectedBooking.id 
-                      ? { ...b, status: 'Cancelled', cancelReason: cancelReason, cancelledAt: new Date().toISOString() }
-                      : b
-                  );
-                  
-                  localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
-                  setBookings(updatedBookings);
-                  
-                  setShowCancelConfirm(false);
-                  setSelectedBooking(null);
-                  setCancelReason('');
-                  
-                  showModal('success', 'Success', 'Booking cancelled successfully!');
+                  if (!checkConnection()) {
+                    showModal('error', 'No Connection', 'Cannot cancel booking. Please check your internet connection.');
+                    return;
+                  }
+
+                  try {
+                    // Update booking status to Cancelled
+                    await adminHelpers.modifyBooking(selectedBooking.id, { booking_status: 'Cancelled' });
+                    const updatedBookings = bookings.map(b => 
+                      b.id === selectedBooking.id 
+                        ? { ...b, status: 'Cancelled', cancelReason: cancelReason, cancelledAt: new Date().toISOString() }
+                        : b
+                    );
+                    
+                    setBookings(updatedBookings);
+                    setShowCancelConfirm(false);
+                    setSelectedBooking(null);
+                    setCancelReason('');
+                    
+                    showModal('success', 'Success', 'Booking cancelled successfully!');
+                  } catch (error) {
+                    console.error('Error cancelling booking:', error);
+                    showModal('error', 'Error', 'Failed to cancel booking. Please try again.');
+                  }
                 }}
                 className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
               >
@@ -4024,16 +4114,26 @@ export function AdminDashboard() {
 
             <div className="flex gap-3">
               <Button
-                onClick={() => {
-                  // Delete booking
-                  const updatedBookings = bookings.filter(b => b.id !== selectedBooking.id);
-                  localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
-                  setBookings(updatedBookings);
-                  
-                  setShowDeleteConfirm(false);
-                  setSelectedBooking(null);
-                  
-                  showModal('success', 'Success', 'Booking deleted successfully!');
+                onClick={async () => {
+                  if (!checkConnection()) {
+                    showModal('error', 'No Connection', 'Cannot delete booking. Please check your internet connection.');
+                    return;
+                  }
+
+                  try {
+                    // Delete booking
+                    await adminHelpers.removeBooking(selectedBooking.id);
+                    const updatedBookings = bookings.filter(b => b.id !== selectedBooking.id);
+                    setBookings(updatedBookings);
+                    
+                    setShowDeleteConfirm(false);
+                    setSelectedBooking(null);
+                    
+                    showModal('success', 'Success', 'Booking deleted successfully!');
+                  } catch (error) {
+                    console.error('Error deleting booking:', error);
+                    showModal('error', 'Error', 'Failed to delete booking. Please try again.');
+                  }
                 }}
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white"
               >
@@ -5270,36 +5370,51 @@ export function AdminDashboard() {
 
             <div className="flex gap-3">
               <Button
-                onClick={() => {
-                  // Remove payment from skyway_payments
-                  const existingPayments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
-                  const updatedPayments = existingPayments.filter((p: any) => p.id !== selectedPayment.id);
-                  localStorage.setItem('skyway_payments', JSON.stringify(updatedPayments));
+                onClick={async () => {
+                  if (!checkConnection()) {
+                    showModal('error', 'No Connection', 'Cannot delete payment. Please check your internet connection.');
+                    return;
+                  }
 
-                  // Remove payment from the booking's payments array
-                  const updatedBookings = bookings.map(booking => {
-                    if (booking.id === selectedPayment.bookingId) {
-                      const updatedBookingPayments = (booking.payments || []).filter((p: any) => p.id !== selectedPayment.id);
-                      return {
-                        ...booking,
-                        payments: updatedBookingPayments
-                      };
-                    }
-                    return booking;
-                  });
+                  try {
+                    // Remove payment from Supabase
+                    await adminHelpers.removePayment(selectedPayment.id);
+                    const updatedPayments = payments.filter(p => p.id !== selectedPayment.id);
+                    setPayments(updatedPayments);
 
-                  // Update bookings state and localStorage
-                  setBookings(updatedBookings);
-                  localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
+                    // Remove payment from the booking's payments array and update booking
+                    const updatedBookings = bookings.map(booking => {
+                      if (booking.id === selectedPayment.bookingId) {
+                        const updatedBookingPayments = (booking.payments || []).filter((p: any) => p.id !== selectedPayment.id);
+                        const totalPaid = updatedBookingPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+                        
+                        // Update booking in Supabase
+                        adminHelpers.modifyBooking(booking.id, {
+                          amount_paid: totalPaid,
+                          payment_status: totalPaid >= booking.totalAmount ? 'Paid in Full' : totalPaid > 0 ? 'Partial Payment' : 'Not Paid'
+                        }).catch(err => console.error('Error updating booking after payment deletion:', err));
+                        
+                        return {
+                          ...booking,
+                          payments: updatedBookingPayments
+                        };
+                      }
+                      return booking;
+                    });
+                    setBookings(updatedBookings);
 
-                  // Trigger refresh
-                  setPaymentsRefreshKey(prev => prev + 1);
+                    // Trigger refresh
+                    setPaymentsRefreshKey(prev => prev + 1);
 
-                  // Close modal and reset
-                  setShowDeletePaymentConfirm(false);
-                  setSelectedPayment(null);
+                    // Close modal and reset
+                    setShowDeletePaymentConfirm(false);
+                    setSelectedPayment(null);
 
-                  showModal('success', 'Success', 'Payment deleted successfully! The booking balance has been updated.');
+                    showModal('success', 'Success', 'Payment deleted successfully! The booking balance has been updated.');
+                  } catch (error) {
+                    console.error('Error deleting payment:', error);
+                    showModal('error', 'Error', 'Failed to delete payment. Please try again.');
+                  }
                 }}
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white"
               >

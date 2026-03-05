@@ -115,10 +115,19 @@ export function Login() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[#36454F] mb-2">
-                    <Lock className="w-4 h-4 inline mr-2" />
-                    Password
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-[#36454F]">
+                      <Lock className="w-4 h-4 inline mr-2" />
+                      Password
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/reset-password')}
+                      className="text-sm text-[#6B7F39] hover:text-[#5a6930] font-medium hover:underline"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
                   <Input
                     type="password"
                     name="password"

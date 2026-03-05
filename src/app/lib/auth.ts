@@ -43,9 +43,28 @@ const AUTH_STORAGE_KEY = 'skyway_auth_user';
  * Login user - Checks Supabase database for authentication
  */
 export async function login(email: string, password: string): Promise<User | null> {
-  // Check if connected
+  // First check if trying to use demo accounts
+  if (email === DEMO_ACCOUNTS.admin.email && password === DEMO_ACCOUNTS.admin.password) {
+    const user = DEMO_ACCOUNTS.admin.user;
+    sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new Event('authChange'));
+    console.warn('⚠️ Using demo admin account (offline mode)');
+    return user;
+  }
+  
+  if (email === DEMO_ACCOUNTS.user.email && password === DEMO_ACCOUNTS.user.password) {
+    const user = DEMO_ACCOUNTS.user.user;
+    sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new Event('authChange'));
+    console.warn('⚠️ Using demo user account (offline mode)');
+    return user;
+  }
+
+  // Check if connected for Supabase authentication
   if (!checkConnection()) {
-    console.error('Cannot login: No internet connection');
+    console.error('Cannot login: No internet connection - Supabase accounts require connection');
     return null;
   }
 
@@ -94,26 +113,6 @@ export async function login(email: string, password: string): Promise<User | nul
     return user;
   } catch (error) {
     console.error('Login error:', error);
-    
-    // Fallback to demo accounts if Supabase fails
-    if (email === DEMO_ACCOUNTS.admin.email && password === DEMO_ACCOUNTS.admin.password) {
-      const user = DEMO_ACCOUNTS.admin.user;
-      sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new Event('authChange'));
-      console.warn('⚠️ Using demo admin account (offline mode)');
-      return user;
-    }
-    
-    if (email === DEMO_ACCOUNTS.user.email && password === DEMO_ACCOUNTS.user.password) {
-      const user = DEMO_ACCOUNTS.user.user;
-      sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new Event('authChange'));
-      console.warn('⚠️ Using demo user account (offline mode)');
-      return user;
-    }
-    
     return null;
   }
 }

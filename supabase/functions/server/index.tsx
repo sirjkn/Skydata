@@ -76,6 +76,50 @@ app.post("/make-server-6a712830/auth/signup", async (c) => {
   }
 });
 
+// Reset password (temporary endpoint for admin password reset)
+app.post("/make-server-6a712830/auth/reset-password", async (c) => {
+  try {
+    const { email, newPassword } = await c.req.json();
+    
+    if (!email || !newPassword) {
+      return c.json({ error: 'Email and new password are required' }, 400);
+    }
+    
+    // Get user by email
+    const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
+    
+    if (listError) {
+      console.log('Error listing users:', listError);
+      return c.json({ error: 'Failed to find user' }, 500);
+    }
+    
+    const user = users.find(u => u.email === email);
+    
+    if (!user) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+    
+    // Update user password
+    const { data, error } = await supabase.auth.admin.updateUserById(
+      user.id,
+      { password: newPassword }
+    );
+    
+    if (error) {
+      console.log('Password reset error:', error);
+      return c.json({ error: error.message }, 400);
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: `Password successfully reset for ${email}` 
+    });
+  } catch (error) {
+    console.log('Password reset exception:', error);
+    return c.json({ error: 'Failed to reset password' }, 500);
+  }
+});
+
 // ===== PROPERTY ROUTES =====
 
 // Get all properties

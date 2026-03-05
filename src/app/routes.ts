@@ -9,6 +9,7 @@ import { Settings } from "./pages/settings";
 import { CustomPage } from "./pages/custom-page";
 import { MenuPagesManager } from "./pages/menu-pages-manager";
 import { ActivityLog } from "./pages/activity-log";
+import ResetPassword from "./pages/ResetPassword";
 import { NotFound } from "./pages/not-found";
 
 export const router = createBrowserRouter([
@@ -31,6 +32,10 @@ export const router = createBrowserRouter([
       {
         path: "signup",
         Component: Signup,
+      },
+      {
+        path: "reset-password",
+        Component: ResetPassword,
       },
       {
         path: "admin/dashboard",
