@@ -281,4 +281,356 @@ app.post("/make-server-6a712830/inquiries", async (c) => {
   }
 });
 
+// Create customer (admin only)
+app.post("/make-server-6a712830/customers", requireAuth, async (c) => {
+  try {
+    const customerData = await c.req.json();
+    const customerId = customerData.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    const customer = {
+      id: customerId,
+      ...customerData,
+      createdAt: customerData.createdAt || new Date().toISOString(),
+    };
+    
+    await kv.set(`customer:${customerId}`, customer);
+    
+    return c.json({ customer });
+  } catch (error) {
+    console.log('Error creating customer:', error);
+    return c.json({ error: 'Failed to create customer' }, 500);
+  }
+});
+
+// Update customer (admin only)
+app.put("/make-server-6a712830/customers/:id", requireAuth, async (c) => {
+  try {
+    const id = c.req.param('id');
+    const updates = await c.req.json();
+    
+    const existingCustomer = await kv.get(`customer:${id}`);
+    if (!existingCustomer) {
+      return c.json({ error: 'Customer not found' }, 404);
+    }
+    
+    const updatedCustomer = {
+      ...existingCustomer,
+      ...updates,
+      id,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    await kv.set(`customer:${id}`, updatedCustomer);
+    
+    return c.json({ customer: updatedCustomer });
+  } catch (error) {
+    console.log('Error updating customer:', error);
+    return c.json({ error: 'Failed to update customer' }, 500);
+  }
+});
+
+// Delete customer (admin only)
+app.delete("/make-server-6a712830/customers/:id", requireAuth, async (c) => {
+  try {
+    const id = c.req.param('id');
+    await kv.del(`customer:${id}`);
+    
+    return c.json({ success: true });
+  } catch (error) {
+    console.log('Error deleting customer:', error);
+    return c.json({ error: 'Failed to delete customer' }, 500);
+  }
+});
+
+// ===== PAYMENT ROUTES =====
+
+// Get all payments (admin only)
+app.get("/make-server-6a712830/payments", requireAuth, async (c) => {
+  try {
+    const payments = await kv.getByPrefix('payment:');
+    return c.json({ payments });
+  } catch (error) {
+    console.log('Error fetching payments:', error);
+    return c.json({ error: 'Failed to fetch payments' }, 500);
+  }
+});
+
+// Create payment (admin only)
+app.post("/make-server-6a712830/payments", requireAuth, async (c) => {
+  try {
+    const paymentData = await c.req.json();
+    const paymentId = paymentData.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    const payment = {
+      id: paymentId,
+      ...paymentData,
+      createdAt: paymentData.createdAt || new Date().toISOString(),
+    };
+    
+    await kv.set(`payment:${paymentId}`, payment);
+    
+    return c.json({ payment });
+  } catch (error) {
+    console.log('Error creating payment:', error);
+    return c.json({ error: 'Failed to create payment' }, 500);
+  }
+});
+
+// Delete payment (admin only)
+app.delete("/make-server-6a712830/payments/:id", requireAuth, async (c) => {
+  try {
+    const id = c.req.param('id');
+    await kv.del(`payment:${id}`);
+    
+    return c.json({ success: true });
+  } catch (error) {
+    console.log('Error deleting payment:', error);
+    return c.json({ error: 'Failed to delete payment' }, 500);
+  }
+});
+
+// ===== SETTINGS ROUTES =====
+
+// Get settings
+app.get("/make-server-6a712830/settings", async (c) => {
+  try {
+    const settings = await kv.get('app:settings') || {};
+    return c.json({ settings });
+  } catch (error) {
+    console.log('Error fetching settings:', error);
+    return c.json({ error: 'Failed to fetch settings' }, 500);
+  }
+});
+
+// Update settings (admin only)
+app.put("/make-server-6a712830/settings", requireAuth, async (c) => {
+  try {
+    const settingsData = await c.req.json();
+    
+    const settings = {
+      ...settingsData,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    await kv.set('app:settings', settings);
+    
+    return c.json({ settings });
+  } catch (error) {
+    console.log('Error updating settings:', error);
+    return c.json({ error: 'Failed to update settings' }, 500);
+  }
+});
+
+// ===== CATEGORIES & FEATURES ROUTES =====
+
+// Get categories
+app.get("/make-server-6a712830/categories", async (c) => {
+  try {
+    const categories = await kv.get('app:categories') || [];
+    return c.json({ categories });
+  } catch (error) {
+    console.log('Error fetching categories:', error);
+    return c.json({ error: 'Failed to fetch categories' }, 500);
+  }
+});
+
+// Update categories (admin only)
+app.put("/make-server-6a712830/categories", requireAuth, async (c) => {
+  try {
+    const { categories } = await c.req.json();
+    await kv.set('app:categories', categories);
+    
+    return c.json({ categories });
+  } catch (error) {
+    console.log('Error updating categories:', error);
+    return c.json({ error: 'Failed to update categories' }, 500);
+  }
+});
+
+// Get features
+app.get("/make-server-6a712830/features", async (c) => {
+  try {
+    const features = await kv.get('app:features') || [];
+    return c.json({ features });
+  } catch (error) {
+    console.log('Error fetching features:', error);
+    return c.json({ error: 'Failed to fetch features' }, 500);
+  }
+});
+
+// Update features (admin only)
+app.put("/make-server-6a712830/features", requireAuth, async (c) => {
+  try {
+    const { features } = await c.req.json();
+    await kv.set('app:features', features);
+    
+    return c.json({ features });
+  } catch (error) {
+    console.log('Error updating features:', error);
+    return c.json({ error: 'Failed to update features' }, 500);
+  }
+});
+
+// ===== ACTIVITY LOG ROUTES =====
+
+// Get activity logs (admin only)
+app.get("/make-server-6a712830/activity-logs", requireAuth, async (c) => {
+  try {
+    const logs = await kv.getByPrefix('activity-log:');
+    return c.json({ logs });
+  } catch (error) {
+    console.log('Error fetching activity logs:', error);
+    return c.json({ error: 'Failed to fetch activity logs' }, 500);
+  }
+});
+
+// Create activity log
+app.post("/make-server-6a712830/activity-logs", async (c) => {
+  try {
+    const logData = await c.req.json();
+    const logId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    const log = {
+      id: logId,
+      ...logData,
+      createdAt: new Date().toISOString(),
+    };
+    
+    await kv.set(`activity-log:${logId}`, log);
+    
+    return c.json({ log });
+  } catch (error) {
+    console.log('Error creating activity log:', error);
+    return c.json({ error: 'Failed to create activity log' }, 500);
+  }
+});
+
+// ===== SYNC ROUTES =====
+
+// Sync all data from localStorage to Supabase (admin only)
+app.post("/make-server-6a712830/sync/upload", requireAuth, async (c) => {
+  try {
+    const { 
+      properties, 
+      customers, 
+      bookings, 
+      payments, 
+      categories, 
+      features, 
+      settings,
+      activityLogs 
+    } = await c.req.json();
+    
+    console.log('Starting data sync to Supabase...');
+    
+    // Sync properties
+    if (properties && Array.isArray(properties)) {
+      for (const property of properties) {
+        await kv.set(`property:${property.id}`, property);
+      }
+      console.log(`✅ Synced ${properties.length} properties`);
+    }
+    
+    // Sync customers
+    if (customers && Array.isArray(customers)) {
+      for (const customer of customers) {
+        await kv.set(`customer:${customer.id}`, customer);
+      }
+      console.log(`✅ Synced ${customers.length} customers`);
+    }
+    
+    // Sync bookings
+    if (bookings && Array.isArray(bookings)) {
+      for (const booking of bookings) {
+        await kv.set(`booking:${booking.id}`, booking);
+      }
+      console.log(`✅ Synced ${bookings.length} bookings`);
+    }
+    
+    // Sync payments
+    if (payments && Array.isArray(payments)) {
+      for (const payment of payments) {
+        await kv.set(`payment:${payment.id}`, payment);
+      }
+      console.log(`✅ Synced ${payments.length} payments`);
+    }
+    
+    // Sync categories
+    if (categories) {
+      await kv.set('app:categories', categories);
+      console.log(`✅ Synced categories`);
+    }
+    
+    // Sync features
+    if (features) {
+      await kv.set('app:features', features);
+      console.log(`✅ Synced features`);
+    }
+    
+    // Sync settings
+    if (settings) {
+      await kv.set('app:settings', settings);
+      console.log(`✅ Synced settings`);
+    }
+    
+    // Sync activity logs
+    if (activityLogs && Array.isArray(activityLogs)) {
+      for (const log of activityLogs) {
+        await kv.set(`activity-log:${log.id}`, log);
+      }
+      console.log(`✅ Synced ${activityLogs.length} activity logs`);
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: 'All data synced successfully to Supabase',
+      counts: {
+        properties: properties?.length || 0,
+        customers: customers?.length || 0,
+        bookings: bookings?.length || 0,
+        payments: payments?.length || 0,
+        activityLogs: activityLogs?.length || 0
+      }
+    });
+  } catch (error) {
+    console.log('Error syncing data to Supabase:', error);
+    return c.json({ error: 'Failed to sync data' }, 500);
+  }
+});
+
+// Download all data from Supabase
+app.get("/make-server-6a712830/sync/download", async (c) => {
+  try {
+    console.log('Downloading all data from Supabase...');
+    
+    const properties = await kv.getByPrefix('property:');
+    const customers = await kv.getByPrefix('customer:');
+    const bookings = await kv.getByPrefix('booking:');
+    const payments = await kv.getByPrefix('payment:');
+    const activityLogs = await kv.getByPrefix('activity-log:');
+    const categories = await kv.get('app:categories') || [];
+    const features = await kv.get('app:features') || [];
+    const settings = await kv.get('app:settings') || {};
+    
+    console.log(`✅ Downloaded ${properties.length} properties`);
+    console.log(`✅ Downloaded ${customers.length} customers`);
+    console.log(`✅ Downloaded ${bookings.length} bookings`);
+    console.log(`✅ Downloaded ${payments.length} payments`);
+    
+    return c.json({ 
+      properties,
+      customers,
+      bookings,
+      payments,
+      categories,
+      features,
+      settings,
+      activityLogs
+    });
+  } catch (error) {
+    console.log('Error downloading data from Supabase:', error);
+    return c.json({ error: 'Failed to download data' }, 500);
+  }
+});
+
 Deno.serve(app.fetch);

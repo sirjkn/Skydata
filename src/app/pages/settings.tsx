@@ -1657,6 +1657,200 @@ export function Settings() {
               {/* Database Settings Tab - Same as before, keeping it intact */}
               {activeTab === 'database' && (
                 <div className="space-y-6">
+                  {/* Supabase Cloud Mode Card */}
+                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
+                    <div className="p-6 bg-gradient-to-r from-emerald-50 to-emerald-100 border-b-2 border-emerald-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-md">
+                            {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase ? (
+                              <Wifi className="w-5 h-5 text-white" />
+                            ) : (
+                              <HardDrive className="w-5 h-5 text-white" />
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-emerald-900">Cloud Storage Mode</h3>
+                            <p className="text-sm text-emerald-700">
+                              {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase 
+                                ? '☁️ Cloud Mode Active - Data saved to Supabase' 
+                                : '💾 Local Mode Active - Data saved to browser'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className={`px-4 py-2 rounded-lg font-semibold text-sm ${
+                          JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase 
+                            ? 'bg-emerald-500 text-white' 
+                            : 'bg-gray-200 text-gray-700'
+                        }`}>
+                          {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase ? 'CLOUD' : 'LOCAL'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-6">
+                      <div className="space-y-4">
+                        <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border-2 border-blue-200">
+                          <Info className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
+                          <div className="space-y-2">
+                            <p className="text-sm font-semibold text-blue-900">
+                              Enable Cloud Storage to make your app accessible from anywhere
+                            </p>
+                            <ul className="text-sm text-blue-700 space-y-1 ml-4 list-disc">
+                              <li>All data saved to Supabase cloud database</li>
+                              <li>Access your data from any device with internet</li>
+                              <li>Automatic synchronization across devices</li>
+                              <li>Secure and scalable cloud infrastructure</li>
+                            </ul>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
+                          <div className="flex items-center gap-3">
+                            {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase ? (
+                              <Wifi className="w-8 h-8 text-emerald-600" />
+                            ) : (
+                              <WifiOff className="w-8 h-8 text-gray-600" />
+                            )}
+                            <div>
+                              <p className="font-semibold text-gray-900">
+                                {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase 
+                                  ? 'Cloud Mode Enabled' 
+                                  : 'Cloud Mode Disabled'}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase 
+                                  ? 'Your app is connected to Supabase' 
+                                  : 'Your app is using local storage only'}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            onClick={async () => {
+                              const currentSettings = JSON.parse(localStorage.getItem('skyway_settings') || '{}');
+                              const newSupabaseState = !currentSettings.useSupabase;
+                              
+                              if (newSupabaseState) {
+                                // Enabling Supabase - sync data to cloud
+                                showModal('confirm', 
+                                  'Enable Cloud Storage?', 
+                                  'This will upload all your local data (properties, customers, bookings, payments) to Supabase cloud storage.\n\nYour data will be accessible from anywhere with internet connection.\n\nDo you want to continue?',
+                                  async () => {
+                                    try {
+                                      // Import the sync function
+                                      const { syncToSupabase } = await import('../lib/data-service');
+                                      
+                                      // Show loading state
+                                      showModal('info', 'Syncing to Cloud...', 'Please wait while we upload your data to Supabase cloud storage...');
+                                      
+                                      // Sync data to Supabase
+                                      const result = await syncToSupabase();
+                                      
+                                      // Enable Supabase mode
+                                      const updatedSettings = { ...currentSettings, useSupabase: true };
+                                      localStorage.setItem('skyway_settings', JSON.stringify(updatedSettings));
+                                      
+                                      logActivity('Cloud Mode Enabled', 'Supabase cloud storage activated and data synced');
+                                      
+                                      showModal('success', 
+                                        'Cloud Storage Enabled!', 
+                                        `✅ Successfully synced to Supabase!\n\n${result.counts?.properties || 0} properties\n${result.counts?.customers || 0} customers\n${result.counts?.bookings || 0} bookings\n${result.counts?.payments || 0} payments\n\nYour app is now fully cloud-based!`,
+                                        () => {
+                                          window.location.reload();
+                                        },
+                                        'Reload App'
+                                      );
+                                    } catch (error: any) {
+                                      console.error('Sync error:', error);
+                                      showModal('error', 'Sync Failed', `Failed to sync data to Supabase:\n\n${error.message}\n\nPlease check your internet connection and try again.`);
+                                    }
+                                  },
+                                  'Enable Cloud Storage',
+                                  'Cancel'
+                                );
+                              } else {
+                                // Disabling Supabase
+                                showModal('confirm', 
+                                  'Disable Cloud Storage?', 
+                                  'This will switch back to local storage mode.\n\nYour cloud data will remain in Supabase but the app will use local storage.\n\nYou can re-enable cloud mode anytime.\n\nContinue?',
+                                  () => {
+                                    const updatedSettings = { ...currentSettings, useSupabase: false };
+                                    localStorage.setItem('skyway_settings', JSON.stringify(updatedSettings));
+                                    logActivity('Cloud Mode Disabled', 'Switched back to local storage mode');
+                                    showModal('success', 'Cloud Storage Disabled', 'App switched to local storage mode successfully!', () => {
+                                      window.location.reload();
+                                    }, 'Reload App');
+                                  },
+                                  'Disable Cloud Storage',
+                                  'Cancel'
+                                );
+                              }
+                            }}
+                            className={`h-12 px-6 rounded-xl font-semibold shadow-md ${
+                              JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase
+                                ? 'bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white'
+                                : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white'
+                            }`}
+                          >
+                            {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase ? (
+                              <>
+                                <WifiOff className="w-4 h-4 mr-2" />
+                                Disable Cloud Storage
+                              </>
+                            ) : (
+                              <>
+                                <Wifi className="w-4 h-4 mr-2" />
+                                Enable Cloud Storage
+                              </>
+                            )}
+                          </Button>
+                        </div>
+
+                        {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase && (
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <Button
+                              onClick={async () => {
+                                try {
+                                  showModal('info', 'Syncing...', 'Uploading latest data to Supabase cloud...');
+                                  const { syncToSupabase } = await import('../lib/data-service');
+                                  const result = await syncToSupabase();
+                                  logActivity('Data Synced', 'Manual sync to Supabase completed');
+                                  showModal('success', 'Sync Complete!', `Data uploaded to cloud successfully!\n\n${result.counts?.properties || 0} properties\n${result.counts?.customers || 0} customers\n${result.counts?.bookings || 0} bookings`);
+                                } catch (error: any) {
+                                  showModal('error', 'Sync Failed', `Failed to sync: ${error.message}`);
+                                }
+                              }}
+                              variant="outline"
+                              className="border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 rounded-xl h-12"
+                            >
+                              <Upload className="w-4 h-4 mr-2" />
+                              Upload to Cloud
+                            </Button>
+                            <Button
+                              onClick={async () => {
+                                try {
+                                  showModal('info', 'Downloading...', 'Fetching latest data from Supabase cloud...');
+                                  const { syncFromSupabase } = await import('../lib/data-service');
+                                  await syncFromSupabase();
+                                  logActivity('Data Downloaded', 'Manual download from Supabase completed');
+                                  showModal('success', 'Download Complete!', 'Latest data downloaded from cloud successfully!\n\nPage will reload to show updated data.', () => {
+                                    window.location.reload();
+                                  }, 'Reload');
+                                } catch (error: any) {
+                                  showModal('error', 'Download Failed', `Failed to download: ${error.message}`);
+                                }
+                              }}
+                              variant="outline"
+                              className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50 rounded-xl h-12"
+                            >
+                              <Download className="w-4 h-4 mr-2" />
+                              Download from Cloud
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Backup and Restore Card */}
                   <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
                     <div className="p-6 bg-gradient-to-r from-purple-50 to-purple-100 border-b-2 border-purple-200">
