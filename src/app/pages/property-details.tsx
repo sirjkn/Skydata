@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import Slider from 'react-slick';
+import { fetchProperties, fetchBookings, fetchCustomers, createBooking } from '../../lib/supabaseData';
+import { ConnectionStatusBanner } from '../components/connection-status';
 import { 
   Building2, 
   ChevronLeft,
@@ -140,45 +142,88 @@ export function PropertyDetails() {
 
   // Load properties and check user login status
   useEffect(() => {
-    const loadedProperties = JSON.parse(localStorage.getItem('skyway_properties') || '[]');
-    const loadedBookings = JSON.parse(localStorage.getItem('skyway_bookings') || '[]');
-    const loggedInUser = JSON.parse(localStorage.getItem('skyway_auth_user') || 'null');
-    const loadedCustomers = JSON.parse(localStorage.getItem('skyway_customers') || '[]');
-    
-    setProperties(loadedProperties);
-    setBookings(loadedBookings);
-    setCurrentUser(loggedInUser);
-    setCustomers(loadedCustomers);
-    
-    // Find the specific property by ID
-    const foundProperty = loadedProperties.find((p: any) => p.id.toString() === id);
-    setProperty(foundProperty);
-    
-    // Check if property is currently booked
-    if (foundProperty) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      const activeBookings = loadedBookings.filter((b: any) => {
-        if (b.propertyId !== foundProperty.id) return false;
-        if (b.status !== 'Confirmed' && b.status !== 'Pending Payment' && b.status !== 'Pending Approval') return false;
+    const loadData = async () => {
+      try {
+        const [loadedProperties, loadedBookings, loadedCustomers] = await Promise.all([
+          fetchProperties(),
+          fetchBookings(),
+          fetchCustomers()
+        ]);
+        const loggedInUser = getCurrentUser();
         
-        const checkoutDate = new Date(b.checkOut);
-        checkoutDate.setHours(0, 0, 0, 0);
+        // Convert Supabase format to app format
+        const formattedProperties = loadedProperties.map(p => ({
+          id: p.property_id,
+          name: p.property_name,
+          category: p.category_id,
+          location: p.location,
+          beds: p.no_of_beds,
+          baths: p.bathrooms,
+          area: p.area_sqft,
+          description: p.description,
+          price: p.price_per_month,
+          photos: typeof p.photos === 'string' ? JSON.parse(p.photos) : p.photos,
+          features: typeof p.features === 'string' ? JSON.parse(p.features) : p.features
+        }));
+
+        const formattedBookings = loadedBookings.map(b => ({
+          id: b.booking_id,
+          propertyId: b.property_id,
+          customerId: b.customer_id,
+          customerName: '', // Will be populated from customer data
+          checkIn: b.check_in_date,
+          checkOut: b.check_out_date,
+          status: b.booking_status,
+          totalAmount: b.total_amount
+        }));
+
+        const formattedCustomers = loadedCustomers.map(c => ({
+          id: c.customer_id,
+          name: c.customer_name,
+          phone: c.phone,
+          email: c.email
+        }));
         
-        return checkoutDate >= today;
-      });
-      
-      if (activeBookings.length > 0) {
-        const latestCheckout = activeBookings.reduce((latest: Date, booking: any) => {
-          const checkoutDate = new Date(booking.checkOut);
-          return checkoutDate > latest ? checkoutDate : latest;
-        }, new Date(activeBookings[0].checkOut));
+        setProperties(formattedProperties);
+        setBookings(formattedBookings);
+        setCurrentUser(loggedInUser);
+        setCustomers(formattedCustomers);
         
-        setPropertyIsBooked(true);
-        setAvailableFromDate(latestCheckout.toLocaleDateString());
+        // Find the specific property by ID
+        const foundProperty = formattedProperties.find((p: any) => p.id.toString() === id);
+        setProperty(foundProperty);
+        
+        // Check if property is currently booked
+        if (foundProperty) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          const activeBookings = formattedBookings.filter((b: any) => {
+            if (b.propertyId !== foundProperty.id) return false;
+            if (b.status !== 'Confirmed' && b.status !== 'Pending Payment' && b.status !== 'Pending Approval') return false;
+            
+            const checkoutDate = new Date(b.checkOut);
+            checkoutDate.setHours(0, 0, 0, 0);
+            
+            return checkoutDate >= today;
+          });
+          
+          if (activeBookings.length > 0) {
+            const latestCheckout = activeBookings.reduce((latest: Date, booking: any) => {
+              const checkoutDate = new Date(booking.checkOut);
+              return checkoutDate > latest ? checkoutDate : latest;
+            }, new Date(activeBookings[0].checkOut));
+            
+            setPropertyIsBooked(true);
+            setAvailableFromDate(latestCheckout.toLocaleDateString());
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load data:', error);
       }
-    }
+    };
+
+    loadData();
   }, [id]);
 
   if (!property) {
@@ -243,7 +288,7 @@ export function PropertyDetails() {
 
   const { days: calculatedDays, totalAmount: calculatedAmount } = calculateModalBookingDetails();
 
-  const handleAddBooking = () => {
+  const handleAddBooking = async () => {
     // Validate required fields
     if (!bookingForm.propertyId || !bookingForm.customerId || !bookingForm.checkIn || !bookingForm.checkOut) {
       showModal('error', 'Incomplete Information', 'Please fill in all required fields!');
@@ -292,52 +337,50 @@ export function PropertyDetails() {
       return;
     }
     
-    // Create new booking
-    const newBooking = {
-      id: Date.now(),
-      propertyId: bookingForm.propertyId, // Keep as string for consistency
-      propertyName: bookingForm.propertyName,
-      customerId: bookingForm.customerId,
-      customerName: bookingForm.customerName,
-      customerEmail: bookingForm.customerEmail,
-      customerPhone: bookingForm.customerPhone,
-      checkIn: bookingForm.checkIn,
-      checkOut: bookingForm.checkOut,
-      numberOfPeople: parseInt(bookingForm.numberOfPeople) || 1,
-      days: calculatedDays,
-      totalAmount: calculatedAmount,
-      status: isAdmin(currentUser) ? 'Confirmed' : 'Pending Approval',
-      payments: [],
-      createdAt: new Date().toISOString()
+    // Create new booking using Supabase
+    const newBookingData = {
+      customer_id: parseInt(bookingForm.customerId),
+      property_id: parseInt(bookingForm.propertyId),
+      check_in_date: bookingForm.checkIn,
+      check_out_date: bookingForm.checkOut,
+      total_amount: calculatedAmount,
+      amount_paid: 0,
+      payment_status: 'Not Paid' as const,
+      booking_status: (isAdmin(currentUser) ? 'Confirmed' : 'Pending') as const,
+      payment_method: null,
+      payment_reference: null,
+      notes: `Number of people: ${bookingForm.numberOfPeople}`,
+      created_by: currentUser ? parseInt(currentUser.id) : null
     };
     
-    // Save to localStorage
-    const updatedBookings = [...bookings, newBooking];
-    localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
-    setBookings(updatedBookings);
-    
-    // Log successful booking creation
-    console.log('✅ Booking Created Successfully:');
-    console.log('- Booking ID:', newBooking.id);
-    console.log('- Property ID:', newBooking.propertyId, '| Property Name:', newBooking.propertyName);
-    console.log('- Customer ID:', newBooking.customerId, '| Customer Name:', newBooking.customerName);
-    console.log('- Status:', newBooking.status);
-    console.log('- Check-in:', newBooking.checkIn, '| Check-out:', newBooking.checkOut);
-    console.log('- Days:', calculatedDays, '| Total Amount: KSh', calculatedAmount.toLocaleString());
-    
-    // SMS Notification to Admin
-    const smsSettings = JSON.parse(localStorage.getItem('skyway_sms_settings') || '{}');
-    const generalSettings = JSON.parse(localStorage.getItem('skyway_general_settings') || '{}');
-    const adminMessage = smsSettings?.defaultMessages?.bookingMadeAdmin || 
-      'New booking made! Visit system to approve and confirm payment.';
-    
-    console.log('📱 SMS Notification to Admin:');
-    console.log(`Provider: ${smsSettings.provider || 'Not configured'}`);
-    console.log(`To: ${generalSettings.companyPhone || 'Admin'}`);
-    console.log(`Message: ${adminMessage}`);
-    
-    // Show success modal with booking details
-    showModal(
+    try {
+      const createdBooking = await createBooking(newBookingData);
+      
+      // Refresh bookings list
+      const updatedBookings = await fetchBookings();
+      const formattedBookings = updatedBookings.map(b => ({
+        id: b.booking_id,
+        propertyId: b.property_id,
+        customerId: b.customer_id,
+        customerName: bookingForm.customerName,
+        checkIn: b.check_in_date,
+        checkOut: b.check_out_date,
+        status: b.booking_status,
+        totalAmount: b.total_amount
+      }));
+      setBookings(formattedBookings);
+      
+      // Log successful booking creation
+      console.log('✅ Booking Created Successfully (Supabase):');
+      console.log('- Booking ID:', createdBooking.booking_id);
+      console.log('- Property ID:', createdBooking.property_id, '| Property Name:', bookingForm.propertyName);
+      console.log('- Customer ID:', createdBooking.customer_id, '| Customer Name:', bookingForm.customerName);
+      console.log('- Status:', createdBooking.booking_status);
+      console.log('- Check-in:', createdBooking.check_in_date, '| Check-out:', createdBooking.check_out_date);
+      console.log('- Days:', calculatedDays, '| Total Amount: KSh', calculatedAmount.toLocaleString());
+      
+      // Show success modal with booking details
+      showModal(
       'success', 
       isAdmin(currentUser) ? 'Booking Created' : 'Booking Submitted Successfully!', 
       `${isAdmin(currentUser) ? 'Booking created successfully!' : 'Your booking request has been submitted and is waiting for approval.'}\n\nProperty: ${bookingForm.propertyName}\nCustomer: ${bookingForm.customerName}\nCheck-in: ${new Date(bookingForm.checkIn).toLocaleDateString()}\nCheck-out: ${new Date(bookingForm.checkOut).toLocaleDateString()}\nDays: ${calculatedDays}\nTotal Amount: KSh ${calculatedAmount.toLocaleString()}\n\n${isAdmin(currentUser) ? '' : '📱 Admin notification sent!'}`,
@@ -362,11 +405,24 @@ export function PropertyDetails() {
         navigate('/');
       },
       'Go to Home'
-    );
+      );
+    } catch (error: any) {
+      console.error('Failed to create booking:', error);
+      showModal(
+        'error',
+        'Booking Failed',
+        error.message === 'NO_CONNECTION' 
+          ? 'No internet connection. Please check your connection and try again.'
+          : 'Failed to create booking. Please try again.'
+      );
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#FAF4EC] overflow-x-hidden">
+      {/* Connection Status Banner */}
+      <ConnectionStatusBanner />
+      
       {/* Header */}
       <Header />
 

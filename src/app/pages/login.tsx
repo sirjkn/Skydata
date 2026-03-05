@@ -23,14 +23,13 @@ export function Login() {
     setError('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    // Simulate a brief loading state
-    setTimeout(() => {
-      const user = login(formData.email, formData.password);
+    try {
+      const user = await login(formData.email, formData.password);
       
       if (user) {
         // Successful login
@@ -38,9 +37,16 @@ export function Login() {
       } else {
         setError('Invalid email or password. Please try again.');
       }
-      
+    } catch (error: any) {
+      if (error.message === 'NO_CONNECTION') {
+        setError('No internet connection. Please check your connection and try again.');
+      } else {
+        setError('An error occurred during login. Please try again.');
+      }
+      console.error('Login error:', error);
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
   const handleDemoLogin = (accountType: 'admin' | 'user') => {

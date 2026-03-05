@@ -36,6 +36,35 @@ import { getCurrentUser, logout, isAdmin } from '../lib/auth';
 import { CustomModal } from '../components/custom-modal';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+// Connection monitoring
+import { checkConnection } from '../../lib/connectionStatus';
+import { ConnectionStatusBanner } from '../components/connection-status';
+import {
+  fetchProperties,
+  fetchCustomers,
+  fetchBookings,
+  fetchCategories,
+  fetchFeatures,
+  fetchPayments,
+  fetchActivityLogs,
+  createProperty,
+  updateProperty,
+  deleteProperty,
+  createCustomer,
+  updateCustomer,
+  deleteCustomer,
+  createBooking,
+  updateBooking,
+  deleteBooking,
+  createCategory,
+  deleteCategory,
+  createFeature,
+  deleteFeature,
+  createPayment,
+  deletePayment,
+  fetchPaymentsByBooking,
+  createActivityLog
+} from '../../lib/supabaseData';
 
 // App version - keep consistent across all modules
 const APP_VERSION = '2.35';
@@ -197,6 +226,10 @@ export function AdminDashboard() {
     totalUsers: 0,
     monthlyRevenue: 0
   });
+  
+  // Connection status
+  const [isOnline, setIsOnline] = useState(checkConnection());
+  const [payments, setPayments] = useState<any[]>([]);
   
   // Property form state
   const [propertyForm, setPropertyForm] = useState({
@@ -426,114 +459,200 @@ export function AdminDashboard() {
     { id: 'settings', label: 'Settings', icon: Settings, active: true }
   ];
 
-  // Load categories and features from localStorage
+  // Check connection status
   useEffect(() => {
-    const savedCategories = localStorage.getItem('skyway_categories');
-    const savedFeatures = localStorage.getItem('skyway_features');
-    const savedProperties = localStorage.getItem('skyway_properties');
-    const savedBookings = localStorage.getItem('skyway_bookings');
-    const savedCustomers = localStorage.getItem('skyway_customers');
-    const savedLogs = localStorage.getItem('skyway_activity_logs');
-    
-    if (savedCategories) {
-      setCategories(JSON.parse(savedCategories));
-    } else {
-      // Start with empty categories
-      setCategories([]);
-    }
-    
-    if (savedFeatures) {
-      setFeatures(JSON.parse(savedFeatures));
-    } else {
-      // Start with empty features
-      setFeatures([]);
-    }
-    
-    if (savedProperties) {
-      const parsedProperties = JSON.parse(savedProperties);
-      setProperties(parsedProperties);
-      
-      // Check if any properties need image migration
-      const needsMigration = parsedProperties.some((prop: any) => {
-        if (!prop.photos) return false;
-        // Check if any photo is not WebP or larger than 55KB (allowing some buffer)
-        return Object.values(prop.photos).some((photoArray: any) => 
-          photoArray.some((photo: string) => {
-            // Check if it's base64 and estimate size
-            const sizeKB = (photo.length * 0.75) / 1024;
-            const isWebP = photo.startsWith('data:image/webp');
-            return !isWebP || sizeKB > 55; // 55KB buffer for 50KB target
-          })
-        );
-      });
-      
-      setShowMigrationButton(needsMigration);
-    } else {
-      // Start with empty properties
-      setProperties([]);
-    }
+    const checkOnlineStatus = () => {
+      setIsOnline(checkConnection());
+    };
 
-    if (savedBookings) {
-      setBookings(JSON.parse(savedBookings));
-    } else {
-      // Start with empty bookings
-      setBookings([]);
-    }
+    checkOnlineStatus();
+    window.addEventListener('online', checkOnlineStatus);
+    window.addEventListener('offline', checkOnlineStatus);
 
-    if (savedCustomers) {
-      setCustomers(JSON.parse(savedCustomers));
-    } else {
-      // Start with empty customers
-      setCustomers([]);
-    }
-
-    if (savedLogs) {
-      setActivityLogs(JSON.parse(savedLogs));
-    }
+    return () => {
+      window.removeEventListener('online', checkOnlineStatus);
+      window.removeEventListener('offline', checkOnlineStatus);
+    };
   }, []);
 
-  // Real-time sync for bookings - reload whenever we switch to relevant menus or periodically
+  // Load all data from Supabase
   useEffect(() => {
+    if (!isOnline) {
+      console.log('⚠️ Offline - Cannot load data');
+      return;
+    }
+
+    const loadAllData = async () => {
+      try {
+        console.log('📡 Loading Admin Dashboard data from Supabase...');
+        
+        // Load categories
+        const categoriesData = await fetchCategories();
+        const categoryNames = categoriesData.map(c => c.category_name);
+        setCategories(categoryNames);
+        console.log('✅ Categories loaded:', categoryNames.length);
+        
+        // Load features
+        const featuresData = await fetchFeatures();
+        const featureNames = featuresData.map(f => f.feature_name);
+        setFeatures(featureNames);
+        console.log('✅ Features loaded:', featureNames.length);
+        
+        // Load properties
+        const propertiesData = await fetchProperties();
+        const mappedProperties = propertiesData.map(p => ({
+          id: p.property_id,
+          name: p.property_name,
+          category: p.category_id,
+          location: p.location,
+          beds: p.no_of_beds,
+          baths: p.bathrooms,
+          area: p.area_sqft,
+          price: p.price_per_month,
+          photos: p.photos ? JSON.parse(p.photos) : {},
+          features: p.features ? JSON.parse(p.features) : [],
+          description: p.description || '',
+          viewCount: p.view_count,
+          isFeatured: p.is_featured,
+          isAvailable: p.is_available
+        }));
+        setProperties(mappedProperties);
+        console.log('✅ Properties loaded:', mappedProperties.length);
+        
+        // Load bookings
+        const bookingsData = await fetchBookings();
+        const mappedBookings = bookingsData.map(b => ({
+          id: b.booking_id,
+          propertyId: b.property_id,
+          customerId: b.customer_id,
+          checkIn: b.check_in_date,
+          checkOut: b.check_out_date,
+          status: b.booking_status,
+          totalAmount: b.total_amount,
+          amountPaid: b.amount_paid,
+          paymentStatus: b.payment_status,
+          paymentMode: b.payment_method,
+          transactionId: b.payment_reference,
+          notes: b.notes,
+          payments: []
+        }));
+        setBookings(mappedBookings);
+        console.log('✅ Bookings loaded:', mappedBookings.length);
+        
+        // Load customers
+        const customersData = await fetchCustomers();
+        const mappedCustomers = customersData.map(c => ({
+          id: c.customer_id,
+          name: c.customer_name,
+          phone: c.phone,
+          email: c.email,
+          address: c.address,
+          password: c.password
+        }));
+        setCustomers(mappedCustomers);
+        console.log('✅ Customers loaded:', mappedCustomers.length);
+        
+        // Load payments
+        const paymentsData = await fetchPayments();
+        const mappedPayments = paymentsData.map(p => ({
+          id: p.payment_id,
+          bookingId: p.booking_id,
+          paidAmount: p.amount,
+          paymentMode: p.payment_method,
+          transactionId: p.payment_reference,
+          date: p.payment_date
+        }));
+        setPayments(mappedPayments);
+        console.log('✅ Payments loaded:', mappedPayments.length);
+        
+        // Load activity logs
+        const logsData = await fetchActivityLogs(100);
+        const mappedLogs = logsData.map(l => ({
+          id: l.activity_id,
+          userId: l.user_id,
+          userName: l.user_name,
+          userRole: l.user_role,
+          activity: l.activity,
+          timestamp: l.created_at
+        }));
+        setActivityLogs(mappedLogs);
+        console.log('✅ Activity logs loaded:', mappedLogs.length);
+        
+        console.log('✅ All Admin Dashboard data loaded successfully!');
+      } catch (error: any) {
+        if (error.message === 'NO_CONNECTION') {
+          console.error('⚠️ No connection - data loading aborted');
+        } else {
+          console.error('❌ Error loading Admin Dashboard data:', error);
+          showModal('error', 'Data Load Error', 'Failed to load dashboard data. Please refresh the page.');
+        }
+      }
+    };
+
+    loadAllData();
+  }, [isOnline]);
+
+  // Real-time sync for bookings - reload whenever we switch to relevant menus
+  useEffect(() => {
+    if (!isOnline) return;
+    
     if (activeMenu === 'overview' || activeMenu === 'properties' || activeMenu === 'bookings') {
-      const loadBookings = () => {
-        const savedBookings = localStorage.getItem('skyway_bookings');
-        if (savedBookings) {
-          const parsedBookings = JSON.parse(savedBookings);
-          setBookings(parsedBookings);
-          // Increment refresh key to force component re-renders
+      const loadBookings = async () => {
+        try {
+          const bookingsData = await fetchBookings();
+          const mappedBookings = bookingsData.map(b => ({
+            id: b.booking_id,
+            propertyId: b.property_id,
+            customerId: b.customer_id,
+            checkIn: b.check_in_date,
+            checkOut: b.check_out_date,
+            status: b.booking_status,
+            totalAmount: b.total_amount,
+            amountPaid: b.amount_paid,
+            paymentStatus: b.payment_status,
+            paymentMode: b.payment_method,
+            transactionId: b.payment_reference,
+            notes: b.notes,
+            payments: []
+          }));
+          setBookings(mappedBookings);
           setBookingsRefreshKey(prev => prev + 1);
+        } catch (error) {
+          console.error('Error reloading bookings:', error);
         }
       };
 
       // Load immediately when switching to these menus
       loadBookings();
 
-      // Set up interval to check for updates every 2 seconds while on these menus
-      const interval = setInterval(loadBookings, 2000);
+      // Set up interval to check for updates every 5 seconds while on these menus
+      const interval = setInterval(loadBookings, 5000);
 
       // Clean up interval when leaving or unmounting
       return () => clearInterval(interval);
     }
-  }, [activeMenu]);
+  }, [activeMenu, isOnline]);
 
-  // Calculate stats whenever properties or bookings change
+  // Calculate stats whenever properties, bookings, or customers change
   useEffect(() => {
-    // Get all users from localStorage
-    const users = JSON.parse(localStorage.getItem('skyway_users') || '[]');
-    
     // Calculate total properties
     const totalProperties = properties.length;
     
     // Calculate active bookings (Confirmed and Pending, not Cancelled)
     const activeBookings = bookings.filter(b => b.status === 'Confirmed' || b.status === 'Pending').length;
     
-    // Calculate total users (excluding admin accounts)
-    const totalUsers = users.filter((u: any) => u.role === 'customer').length;
+    // Calculate total users (customers)
+    const totalUsers = customers.length;
     
-    // Calculate monthly revenue from confirmed bookings
-    const monthlyRevenue = bookings
-      .filter(b => b.status === 'Confirmed')
-      .reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+    // Calculate monthly revenue from all payments
+    const monthlyRevenue = payments
+      .filter(p => {
+        const paymentDate = new Date(p.date);
+        const now = new Date();
+        return paymentDate.getMonth() === now.getMonth() && 
+               paymentDate.getFullYear() === now.getFullYear();
+      })
+      .reduce((sum, p) => sum + (p.paidAmount || 0), 0);
     
     setStats({
       totalProperties,
@@ -541,14 +660,13 @@ export function AdminDashboard() {
       totalUsers,
       monthlyRevenue
     });
-  }, [properties, bookings]);
+  }, [properties, bookings, customers, payments]);
 
   // Populate payment form when booking is selected
   useEffect(() => {
     if (selectedBooking && showPaymentModal) {
       // Get existing payments for this booking
-      const existingPayments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
-      const bookingPayments = existingPayments.filter((p: any) => p.bookingId === selectedBooking.id);
+      const bookingPayments = payments.filter((p: any) => p.bookingId === selectedBooking.id);
       
       // Calculate total paid amount
       const totalPaid = bookingPayments.reduce((sum: number, payment: any) => sum + (payment.paidAmount || 0), 0);
@@ -562,7 +680,7 @@ export function AdminDashboard() {
         paidAmount: Math.max(0, remainingBalance).toString() // Default paid amount to remaining balance
       }));
     }
-  }, [selectedBooking, showPaymentModal]);
+  }, [selectedBooking, showPaymentModal, payments]);
 
   // Handle click outside for book property dropdown
   useEffect(() => {
@@ -583,8 +701,7 @@ export function AdminDashboard() {
 
   // Helper function to calculate booking payment status
   const getBookingPaymentStatus = (booking: any) => {
-    const existingPayments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
-    const bookingPayments = existingPayments.filter((p: any) => p.bookingId === booking.id);
+    const bookingPayments = payments.filter((p: any) => p.bookingId === booking.id);
     const totalPaid = bookingPayments.reduce((sum: number, payment: any) => sum + (payment.paidAmount || 0), 0);
     const remaining = (booking.totalAmount || 0) - totalPaid;
     
@@ -607,13 +724,31 @@ export function AdminDashboard() {
     return result;
   };
 
-  // Force reload bookings from localStorage
-  const forceReloadBookings = () => {
-    const savedBookings = localStorage.getItem('skyway_bookings');
-    if (savedBookings) {
-      const parsedBookings = JSON.parse(savedBookings);
-      setBookings(parsedBookings);
+  // Force reload bookings from Supabase
+  const forceReloadBookings = async () => {
+    if (!isOnline) return;
+    
+    try {
+      const bookingsData = await fetchBookings();
+      const mappedBookings = bookingsData.map(b => ({
+        id: b.booking_id,
+        propertyId: b.property_id,
+        customerId: b.customer_id,
+        checkIn: b.check_in_date,
+        checkOut: b.check_out_date,
+        status: b.booking_status,
+        totalAmount: b.total_amount,
+        amountPaid: b.amount_paid,
+        paymentStatus: b.payment_status,
+        paymentMode: b.payment_method,
+        transactionId: b.payment_reference,
+        notes: b.notes,
+        payments: []
+      }));
+      setBookings(mappedBookings);
       setBookingsRefreshKey(prev => prev + 1); // Trigger re-render
+    } catch (error) {
+      console.error('Error reloading bookings:', error);
     }
   };
 
@@ -633,24 +768,56 @@ export function AdminDashboard() {
   };
 
   // Handle Add Category
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
+    if (!isOnline) {
+      showModal('error', 'No Connection', 'Cannot add category while offline.');
+      return;
+    }
+    
     if (newCategory.trim() && !categories.includes(newCategory.trim())) {
-      const updatedCategories = [...categories, newCategory.trim()];
-      setCategories(updatedCategories);
-      localStorage.setItem('skyway_categories', JSON.stringify(updatedCategories));
-      setNewCategory('');
-      setShowCategoryModal(false);
+      try {
+        await createCategory({
+          category_name: newCategory.trim(),
+          description: null,
+          icon: null
+        });
+        
+        const updatedCategories = [...categories, newCategory.trim()];
+        setCategories(updatedCategories);
+        setNewCategory('');
+        setShowCategoryModal(false);
+        showModal('success', 'Category Added', `Category "${newCategory.trim()}" has been added successfully.`);
+      } catch (error) {
+        console.error('Error adding category:', error);
+        showModal('error', 'Error', 'Failed to add category. Please try again.');
+      }
     }
   };
 
   // Handle Add Feature
-  const handleAddFeature = () => {
+  const handleAddFeature = async () => {
+    if (!isOnline) {
+      showModal('error', 'No Connection', 'Cannot add feature while offline.');
+      return;
+    }
+    
     if (newFeature.trim() && !features.includes(newFeature.trim())) {
-      const updatedFeatures = [...features, newFeature.trim()];
-      setFeatures(updatedFeatures);
-      localStorage.setItem('skyway_features', JSON.stringify(updatedFeatures));
-      setNewFeature('');
-      setShowFeatureModal(false);
+      try {
+        await createFeature({
+          feature_name: newFeature.trim(),
+          description: null,
+          icon: null
+        });
+        
+        const updatedFeatures = [...features, newFeature.trim()];
+        setFeatures(updatedFeatures);
+        setNewFeature('');
+        setShowFeatureModal(false);
+        showModal('success', 'Feature Added', `Feature "${newFeature.trim()}" has been added successfully.`);
+      } catch (error) {
+        console.error('Error adding feature:', error);
+        showModal('error', 'Error', 'Failed to add feature. Please try again.');
+      }
     }
   };
 
@@ -1396,9 +1563,11 @@ export function AdminDashboard() {
     Math.ceil((new Date(bookingForm.checkOut).getTime() - new Date(bookingForm.checkIn).getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
   return (
-    <div className="min-h-screen bg-[#f0f0f0] flex">
-      {/* Sidebar */}
-      <aside className={`bg-[#36454F] border-r border-gray-200 transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'}`}>
+    <>
+      <ConnectionStatusBanner />
+      <div className="min-h-screen bg-[#f0f0f0] flex">
+        {/* Sidebar */}
+        <aside className={`bg-[#36454F] border-r border-gray-200 transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'}`}>
         <div className="sticky top-0 h-screen flex flex-col">
           {/* Sidebar Header */}
           <div className="p-4 border-b border-gray-600">
@@ -5449,6 +5618,7 @@ export function AdminDashboard() {
         confirmText={modalState.confirmText}
         cancelText={modalState.cancelText}
       />
-    </div>
+      </div>
+    </>
   );
 }

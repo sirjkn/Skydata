@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router';
 import { Building2, LogOut, Menu, X, ExternalLink } from 'lucide-react';
 import { Button } from './ui/button';
 import { getCurrentUser, logout, isAdmin } from '../lib/auth';
+import { fetchMenuPages } from '../../lib/supabaseData';
+import { ConnectionStatusIndicator } from './connection-status';
 
 export function Header() {
   const navigate = useNavigate();
@@ -27,24 +29,32 @@ export function Header() {
     };
   }, []);
 
-  // Load menu items from localStorage
+  // Load menu items from Supabase
   useEffect(() => {
-    const loadMenuItems = () => {
-      const savedMenuItems = localStorage.getItem('skyway_menu_items');
-      if (savedMenuItems) {
-        const items = JSON.parse(savedMenuItems);
-        setMenuItems(items.filter((item: any) => item.showInMenu));
+    const loadMenuItems = async () => {
+      try {
+        const pages = await fetchMenuPages();
+        // Convert Supabase menu pages to menu items format
+        const items = pages.map(page => ({
+          id: page.page_id,
+          title: page.page_name,
+          slug: page.page_slug,
+          type: 'custom',
+          showInMenu: true
+        }));
+        setMenuItems(items);
+      } catch (error) {
+        console.error('Failed to load menu items:', error);
+        setMenuItems([]);
       }
     };
 
     loadMenuItems();
 
     // Listen for menu updates
-    window.addEventListener('storage', loadMenuItems);
     window.addEventListener('menuItemsUpdated', loadMenuItems);
 
     return () => {
-      window.removeEventListener('storage', loadMenuItems);
       window.removeEventListener('menuItemsUpdated', loadMenuItems);
     };
   }, []);
@@ -99,6 +109,11 @@ export function Header() {
           </nav>
           
           <div className="flex items-center gap-4">
+            {/* Connection Status */}
+            <div className="hidden md:block">
+              <ConnectionStatusIndicator />
+            </div>
+            
             {/* Mobile menu toggle */}
             {menuItems.length > 0 && (
               <button

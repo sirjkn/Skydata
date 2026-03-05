@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
+import { fetchProperties, fetchBookings } from '../../lib/supabaseData';
+import { ConnectionStatusBanner } from '../components/connection-status';
 import Slider from 'react-slick';
 import { 
   Shield, 
@@ -114,12 +116,51 @@ export function Home() {
     message: ''
   });
 
-  // Load properties and bookings from localStorage
+  // Load properties and bookings from Supabase
   useEffect(() => {
-    const loadedProperties = JSON.parse(localStorage.getItem('skyway_properties') || '[]');
-    const loadedBookings = JSON.parse(localStorage.getItem('skyway_bookings') || '[]');
-    setProperties(loadedProperties);
-    setBookings(loadedBookings);
+    const loadData = async () => {
+      try {
+        const [loadedProperties, loadedBookings] = await Promise.all([
+          fetchProperties(),
+          fetchBookings()
+        ]);
+        
+        // Convert Supabase format to app format
+        const formattedProperties = loadedProperties.map(p => ({
+          id: p.property_id,
+          name: p.property_name,
+          category: p.category_id,
+          location: p.location,
+          beds: p.no_of_beds,
+          baths: p.bathrooms,
+          area: p.area_sqft,
+          description: p.description,
+          price: p.price_per_month,
+          photos: typeof p.photos === 'string' ? JSON.parse(p.photos) : p.photos,
+          features: typeof p.features === 'string' ? JSON.parse(p.features) : p.features,
+          createdAt: p.created_at
+        }));
+
+        const formattedBookings = loadedBookings.map(b => ({
+          id: b.booking_id,
+          propertyId: b.property_id,
+          customerId: b.customer_id,
+          checkIn: b.check_in_date,
+          checkOut: b.check_out_date,
+          status: b.booking_status,
+          totalAmount: b.total_amount
+        }));
+        
+        setProperties(formattedProperties);
+        setBookings(formattedBookings);
+      } catch (error) {
+        console.error('Failed to load data:', error);
+        setProperties([]);
+        setBookings([]);
+      }
+    };
+
+    loadData();
   }, []);
 
   const heroSettings = {
@@ -150,6 +191,9 @@ export function Home() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Connection Status Banner */}
+      <ConnectionStatusBanner />
+      
       {/* Header */}
       <Header />
 

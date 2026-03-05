@@ -136,6 +136,11 @@ export function canPerformOperations(): boolean {
   return isOnlineGlobal && isSupabaseConnected;
 }
 
+// Alias for checkConnection (used in other files)
+export function checkConnection(): boolean {
+  return isOnlineGlobal && isSupabaseConnected;
+}
+
 // Get Supabase client (for external use)
 export function getConnectionSupabaseClient() {
   if (!supabaseUrl || !supabaseKey) {
