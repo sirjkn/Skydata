@@ -52,11 +52,10 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Header } from '../components/header';
 import { getCurrentUser } from '../lib/auth';
-import { SyncStatsDisplay } from '../components/sync-stats-display';
 
 type SettingsTab = 'general' | 'homepage' | 'users' | 'database' | 'sms';
 
-const APP_VERSION = '3.0'; // Format: Version 3.0
+const APP_VERSION = '2.35'; // Format: Version 235 = 2.35
 
 export function Settings() {
   const navigate = useNavigate();
@@ -830,37 +829,37 @@ export function Settings() {
         </header>
 
         {/* Settings Content */}
-        <main className="flex-1 overflow-auto p-3 bg-gradient-to-br from-[#FAF4EC] via-[#f5ede3] to-[#ebe2d5]">
+        <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-[#FAF4EC] via-[#f5ede3] to-[#ebe2d5]">
 
         {/* Creative Page Header - Reduced by 30% */}
-        <div className="mb-4 relative overflow-hidden">
+        <div className="mb-8 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-[#6B7F39]/10 via-[#36454F]/10 to-[#6B7F39]/10 rounded-3xl"></div>
           <div className="absolute top-0 right-0 w-64 h-64 bg-[#6B7F39]/5 rounded-full blur-3xl"></div>
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#36454F]/5 rounded-full blur-3xl"></div>
           
-          <div className="relative p-3 md:p-4 rounded-2xl border border-[#6B7F39]/20 bg-white/70 backdrop-blur-md shadow-lg">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#6B7F39] to-[#36454F] flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform duration-300">
-                <SettingsIcon className="w-4 h-4 text-white animate-spin-slow" style={{ animationDuration: '8s' }} />
+          <div className="relative p-6 md:p-7 rounded-3xl border-2 border-[#6B7F39]/20 bg-white/70 backdrop-blur-md shadow-2xl">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#6B7F39] to-[#36454F] flex items-center justify-center shadow-xl transform hover:scale-110 transition-transform duration-300">
+                <SettingsIcon className="w-7 h-7 text-white animate-spin-slow" style={{ animationDuration: '8s' }} />
               </div>
               <div className="flex-1">
-                <h1 className="text-xl md:text-2xl font-bold text-[#36454F] mb-1 bg-clip-text text-transparent bg-gradient-to-r from-[#36454F] to-[#6B7F39]">
+                <h1 className="text-3xl md:text-4xl font-bold text-[#36454F] mb-2 bg-clip-text text-transparent bg-gradient-to-r from-[#36454F] to-[#6B7F39]">
                   Settings Center
                 </h1>
-                <p className="text-gray-600 text-xs">Configure and manage your Skyway Suites platform</p>
+                <p className="text-gray-600 text-base">Configure and manage your Skyway Suites platform</p>
               </div>
               
               {/* Quick Stats */}
-              <div className="flex gap-2">
-                <div className="bg-gradient-to-br from-[#6B7F39] to-[#5a6930] rounded-xl p-2 text-white shadow-md">
-                  <Users className="w-3 h-3 mb-0.5 opacity-80" />
-                  <p className="text-lg font-bold">{stats.totalUsers}</p>
-                  <p className="text-[10px] opacity-80">Total Users</p>
+              <div className="flex gap-3">
+                <div className="bg-gradient-to-br from-[#6B7F39] to-[#5a6930] rounded-2xl p-3 text-white shadow-lg">
+                  <Users className="w-5 h-5 mb-1 opacity-80" />
+                  <p className="text-2xl font-bold">{stats.totalUsers}</p>
+                  <p className="text-xs opacity-80">Total Users</p>
                 </div>
-                <div className="bg-gradient-to-br from-[#36454F] to-[#2a3640] rounded-xl p-2 text-white shadow-md">
-                  <CheckCircle2 className="w-3 h-3 mb-0.5 opacity-80" />
-                  <p className="text-lg font-bold">{dbSettings.dbType === 'local' ? 'Local' : 'Remote'}</p>
-                  <p className="text-[10px] opacity-80">Database</p>
+                <div className="bg-gradient-to-br from-[#36454F] to-[#2a3640] rounded-2xl p-3 text-white shadow-lg">
+                  <CheckCircle2 className="w-5 h-5 mb-1 opacity-80" />
+                  <p className="text-2xl font-bold">{dbSettings.dbType === 'local' ? 'Local' : 'Remote'}</p>
+                  <p className="text-xs opacity-80">Database</p>
                 </div>
               </div>
             </div>
@@ -868,22 +867,22 @@ export function Settings() {
         </div>
 
         {/* Main Layout with Sidebar */}
-        <div className="flex flex-col lg:flex-row gap-3">
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Creative Sidebar */}
-          <aside className="lg:w-56 flex-shrink-0">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden sticky top-4">
+          <aside className="lg:w-72 flex-shrink-0">
+            <div className="bg-white rounded-3xl shadow-2xl border-2 border-gray-100 overflow-hidden sticky top-4">
               {/* Sidebar Header */}
-              <div className="p-3 bg-gradient-to-br from-[#6B7F39] to-[#36454F] relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-                <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full -ml-8 -mb-8"></div>
+              <div className="p-6 bg-gradient-to-br from-[#6B7F39] to-[#36454F] relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
                 <div className="relative">
-                  <h3 className="text-white font-bold text-base mb-0.5">Navigation</h3>
-                  <p className="text-white/70 text-xs">Select a module</p>
+                  <h3 className="text-white font-bold text-xl mb-1">Navigation</h3>
+                  <p className="text-white/70 text-sm">Select a module</p>
                 </div>
               </div>
 
               {/* Navigation Items */}
-              <nav className="p-2 space-y-1">
+              <nav className="p-4 space-y-2">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -895,23 +894,23 @@ export function Settings() {
                         isActive ? 'transform scale-105' : ''
                       }`}
                     >
-                      <div className={`relative flex items-center gap-2 px-3 py-2 rounded-xl font-medium transition-all duration-300 ${
+                      <div className={`relative flex items-center gap-4 px-5 py-4 rounded-2xl font-medium transition-all duration-300 ${
                         isActive
-                          ? `bg-gradient-to-r ${tab.color} text-white shadow-md`
-                          : `${tab.bgColor} ${tab.textColor} hover:shadow-sm`
+                          ? `bg-gradient-to-r ${tab.color} text-white shadow-lg`
+                          : `${tab.bgColor} ${tab.textColor} hover:shadow-md`
                       }`}>
-                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                           isActive ? 'bg-white/20' : 'bg-white'
                         } transition-all duration-300`}>
-                          <Icon className={`w-3 h-3 ${isActive ? 'text-white' : tab.textColor}`} />
+                          <Icon className={`w-5 h-5 ${isActive ? 'text-white' : tab.textColor}`} />
                         </div>
                         <div className="text-left flex-1">
-                          <p className={`font-semibold text-xs ${isActive ? 'text-white' : ''}`}>
+                          <p className={`font-semibold text-sm ${isActive ? 'text-white' : ''}`}>
                             {tab.label}
                           </p>
                         </div>
                         {isActive && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
+                          <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
                         )}
                       </div>
                     </button>
@@ -925,16 +924,16 @@ export function Settings() {
           {/* Main Content Area */}
           <div className="flex-1">
             {/* Content Header */}
-            <div className={`mb-3 p-3 rounded-xl bg-gradient-to-r ${currentTabData?.color} text-white shadow-md`}>
-              <div className="flex items-center gap-2">
+            <div className={`mb-6 p-6 rounded-2xl bg-gradient-to-r ${currentTabData?.color} text-white shadow-lg`}>
+              <div className="flex items-center gap-4">
                 {currentTabData && (
                   <>
-                    <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                      <currentTabData.icon className="w-4 h-4" />
+                    <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                      <currentTabData.icon className="w-6 h-6" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold">{currentTabData.label}</h2>
-                      <p className="text-white/80 text-xs">
+                      <h2 className="text-2xl font-bold">{currentTabData.label}</h2>
+                      <p className="text-white/80 text-sm">
                         {activeTab === 'general' && 'Configure your company information and preferences'}
                         {activeTab === 'homepage' && `Managing ${stats.totalSlides} slides and home page content`}
                         {activeTab === 'users' && `Managing ${stats.totalUsers} users across the platform`}
@@ -948,42 +947,42 @@ export function Settings() {
             </div>
 
             {/* Tab Content */}
-            <div className="space-y-3">
+            <div className="space-y-6">
               {/* General Settings Tab */}
               {activeTab === 'general' && (
-                <div className="space-y-3">
+                <div className="space-y-6">
                   {/* Company Details Card */}
-                  <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                    <div className="p-3 bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
-                          <Building2 className="w-3 h-3 text-white" />
+                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                    <div className="p-6 bg-gradient-to-r from-blue-50 to-blue-100 border-b-2 border-blue-200">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
+                          <Building2 className="w-5 h-5 text-white" />
                         </div>
-                        <h3 className="text-sm font-bold text-blue-900">Company Details</h3>
+                        <h3 className="text-xl font-bold text-blue-900">Company Details</h3>
                       </div>
                     </div>
-                    <div className="p-3 space-y-3">
+                    <div className="p-6 space-y-6">
                       {/* Company Logo */}
-                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-3 border border-dashed border-gray-300">
-                        <label className="block text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
-                          <Upload className="w-3 h-3" />
+                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border-2 border-dashed border-gray-300">
+                        <label className="block text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                          <Upload className="w-4 h-4" />
                           Company Logo
                         </label>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-6">
                           {generalSettings.companyLogo ? (
                             <div className="relative group">
                               <img
                                 src={generalSettings.companyLogo}
                                 alt="Company Logo"
-                                className="w-16 h-16 object-contain border border-gray-300 rounded-lg bg-white shadow-sm"
+                                className="w-24 h-24 object-contain border-2 border-gray-300 rounded-xl bg-white shadow-md"
                               />
-                              <div className="absolute inset-0 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <Edit className="w-4 h-4 text-white" />
+                              <div className="absolute inset-0 bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Edit className="w-6 h-6 text-white" />
                               </div>
                             </div>
                           ) : (
-                            <div className="w-16 h-16 border border-dashed border-gray-400 rounded-lg flex items-center justify-center bg-white">
-                              <Building2 className="w-5 h-5 text-gray-400" />
+                            <div className="w-24 h-24 border-2 border-dashed border-gray-400 rounded-xl flex items-center justify-center bg-white">
+                              <Building2 className="w-8 h-8 text-gray-400" />
                             </div>
                           )}
                           <div>
@@ -1008,39 +1007,39 @@ export function Settings() {
                       </div>
 
                       {/* Company Info Grid - 2 Columns */}
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-6">
                         {/* Company Name */}
-                        <div className="space-y-1">
-                          <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
-                            <Building2 className="w-3 h-3 text-blue-600" />
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                            <Building2 className="w-4 h-4 text-blue-600" />
                             Company Name
                           </label>
                           <Input
                             value={generalSettings.companyName}
                             onChange={(e) => setGeneralSettings({...generalSettings, companyName: e.target.value})}
                             placeholder="Enter company name"
-                            className="border border-gray-200 focus:border-blue-500 rounded-lg h-8 text-xs"
+                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
                           />
                         </div>
 
                         {/* Phone */}
-                        <div className="space-y-1">
-                          <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
-                            <Phone className="w-3 h-3 text-green-600" />
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                            <Phone className="w-4 h-4 text-green-600" />
                             Phone Number
                           </label>
                           <Input
                             value={generalSettings.companyPhone}
                             onChange={(e) => setGeneralSettings({...generalSettings, companyPhone: e.target.value})}
                             placeholder="+254 700 123 456"
-                            className="border border-gray-200 focus:border-blue-500 rounded-lg h-8 text-xs"
+                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
                           />
                         </div>
 
                         {/* Email */}
-                        <div className="space-y-1">
-                          <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
-                            <Mail className="w-3 h-3 text-red-600" />
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                            <Mail className="w-4 h-4 text-red-600" />
                             Email Address
                           </label>
                           <Input
@@ -1048,14 +1047,14 @@ export function Settings() {
                             value={generalSettings.companyEmail}
                             onChange={(e) => setGeneralSettings({...generalSettings, companyEmail: e.target.value})}
                             placeholder="info@skywaysuites.co.ke"
-                            className="border border-gray-200 focus:border-blue-500 rounded-lg h-8 text-xs"
+                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
                           />
                         </div>
 
                         {/* Website */}
-                        <div className="space-y-1">
-                          <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
-                            <Globe className="w-3 h-3 text-indigo-600" />
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                            <Globe className="w-4 h-4 text-indigo-600" />
                             Website
                           </label>
                           <Input
@@ -1063,35 +1062,35 @@ export function Settings() {
                             value={generalSettings.companyWebsite}
                             onChange={(e) => setGeneralSettings({...generalSettings, companyWebsite: e.target.value})}
                             placeholder="https://skywaysuites.co.ke"
-                            className="border border-gray-200 focus:border-blue-500 rounded-lg h-8 text-xs"
+                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
                           />
                         </div>
 
                         {/* Address */}
-                        <div className="space-y-1">
-                          <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
-                            <MapPin className="w-3 h-3 text-purple-600" />
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                            <MapPin className="w-4 h-4 text-purple-600" />
                             Address
                           </label>
                           <Input
                             value={generalSettings.companyAddress}
                             onChange={(e) => setGeneralSettings({...generalSettings, companyAddress: e.target.value})}
                             placeholder="Nairobi, Kenya"
-                            className="border border-gray-200 focus:border-blue-500 rounded-lg h-8 text-xs"
+                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
                           />
                         </div>
 
                         {/* Currency */}
-                        <div className="space-y-1">
-                          <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
-                            <DollarSign className="w-3 h-3 text-yellow-600" />
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                            <DollarSign className="w-4 h-4 text-yellow-600" />
                             Currency
                           </label>
                           <Select
                             value={generalSettings.currency}
                             onValueChange={(value) => setGeneralSettings({...generalSettings, currency: value})}
                           >
-                            <SelectTrigger className="border border-gray-200 focus:border-blue-500 rounded-lg h-8 text-xs">
+                            <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1105,12 +1104,12 @@ export function Settings() {
                       </div>
 
                       {/* Save Button */}
-                      <div className="pt-2 border-t border-gray-100">
+                      <div className="pt-4 border-t-2 border-gray-100">
                         <Button 
                           onClick={handleSaveGeneralSettings}
-                          className="w-full md:w-auto bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 text-xs"
+                          className="w-full md:w-auto bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-6 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                         >
-                          <Save className="w-3 h-3 mr-1" />
+                          <Save className="w-5 h-5 mr-2" />
                           Save General Settings
                         </Button>
                       </div>
@@ -1121,62 +1120,62 @@ export function Settings() {
 
               {/* Home Page Settings Tab */}
               {activeTab === 'homepage' && (
-                <div className="space-y-3">
+                <div className="space-y-6">
                   {/* Slideshow Management */}
-                  <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-                    <div className="p-3 bg-gradient-to-r from-indigo-50 to-indigo-100 border-b border-indigo-200">
+                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
+                    <div className="p-6 bg-gradient-to-r from-indigo-50 to-indigo-100 border-b-2 border-indigo-200">
                       <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-sm">
-                            <Image className="w-3 h-3 text-white" />
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md">
+                            <Image className="w-5 h-5 text-white" />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-indigo-900">Slideshow Management</h3>
-                            <p className="text-xs text-indigo-700">{homePageSettings.slides.length} active slides</p>
+                            <h3 className="text-xl font-bold text-indigo-900">Slideshow Management</h3>
+                            <p className="text-sm text-indigo-700">{homePageSettings.slides.length} active slides</p>
                           </div>
                         </div>
                         <Button
                           onClick={handleAddSlide}
-                          className="bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-xs py-1 px-2 h-auto"
+                          className="bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828]"
                         >
-                          <Plus className="w-3 h-3 mr-1" />
+                          <Plus className="w-4 h-4 mr-2" />
                           Add Slide
                         </Button>
                       </div>
                     </div>
-                    <div className="p-3 space-y-2">
+                    <div className="p-6 space-y-4">
                       {homePageSettings.slides.map((slide, index) => (
                         <div
                           key={slide.id}
-                          className="group bg-gradient-to-r from-[#FAF4EC] to-[#f5ede3] rounded-xl p-2 border border-gray-200 hover:border-indigo-400 transition-all duration-300"
+                          className="group bg-gradient-to-r from-[#FAF4EC] to-[#f5ede3] rounded-2xl p-5 border-2 border-gray-200 hover:border-indigo-400 transition-all duration-300"
                         >
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 text-white font-bold flex items-center justify-center shadow-sm text-xs">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white font-bold flex items-center justify-center shadow-md">
                                 {index + 1}
                               </div>
                               <div>
-                                <p className="font-bold text-[#36454F] text-sm">{slide.title}</p>
-                                <p className="text-gray-600 text-xs">{slide.subtitle}</p>
+                                <p className="font-bold text-[#36454F] text-lg">{slide.title}</p>
+                                <p className="text-gray-600 text-sm">{slide.subtitle}</p>
                               </div>
                             </div>
-                            <div className="flex gap-1">
+                            <div className="flex gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleEditSlide(slide)}
-                                className="border border-blue-500 text-blue-600 hover:bg-blue-50 h-auto py-1 px-2 text-xs"
+                                className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
                               >
-                                <Edit className="w-3 h-3 mr-0.5" />
+                                <Edit className="w-4 h-4 mr-1" />
                                 Edit
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleDeleteSlide(slide.id)}
-                                className="border border-red-500 text-red-600 hover:bg-red-50 h-auto py-1 px-2 text-xs"
+                                className="border-2 border-red-500 text-red-600 hover:bg-red-50"
                               >
-                                <Trash2 className="w-3 h-3 mr-0.5" />
+                                <Trash2 className="w-4 h-4 mr-1" />
                                 Delete
                               </Button>
                             </div>
@@ -1491,9 +1490,9 @@ export function Settings() {
                   <div className="bg-white rounded-2xl shadow-lg border-2 border-green-300 p-6">
                     <Button 
                       onClick={handleSaveHomePageSettings}
-                      className="w-full bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-bold py-2 px-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 text-sm"
+                      className="w-full bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-bold py-6 px-8 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 text-lg"
                     >
-                      <Save className="w-3 h-3 mr-1" />
+                      <Save className="w-6 h-6 mr-3" />
                       Save All Home Page Settings
                     </Button>
                   </div>
@@ -1502,21 +1501,21 @@ export function Settings() {
 
               {/* Users Settings Tab */}
               {activeTab === 'users' && (
-                <div className="space-y-3">
-                  <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+                <div className="space-y-6">
+                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
                     {/* Header */}
-                    <div className="p-3 bg-gradient-to-r from-green-50 to-green-100 border-b border-green-200">
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-sm">
-                            <Users className="w-3 h-3 text-white" />
+                    <div className="p-6 bg-gradient-to-r from-green-50 to-green-100 border-b-2 border-green-200">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-md">
+                            <Users className="w-5 h-5 text-white" />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-green-900">User Management</h3>
-                            <p className="text-xs text-green-700">{users.length} registered users</p>
+                            <h3 className="text-xl font-bold text-green-900">User Management</h3>
+                            <p className="text-sm text-green-700">{users.length} registered users</p>
                           </div>
                         </div>
-                        <div className="flex gap-1">
+                        <div className="flex gap-2">
                           <Button
                             onClick={() => {
                               setEditingUser(null);
@@ -1529,17 +1528,17 @@ export function Settings() {
                               });
                               setShowAddUserModal(true);
                             }}
-                            className="bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] shadow-sm text-xs py-1 px-2 h-auto"
+                            className="bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] shadow-md"
                           >
-                            <Plus className="w-3 h-3 mr-1" />
+                            <Plus className="w-4 h-4 mr-2" />
                             Add User
                           </Button>
                           <Button
                             onClick={() => setShowManageRolesModal(true)}
                             variant="outline"
-                            className="border border-blue-500 text-blue-600 hover:bg-blue-50 text-xs py-1 px-2 h-auto"
+                            className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
                           >
-                            <Shield className="w-3 h-3 mr-1" />
+                            <Shield className="w-4 h-4 mr-2" />
                             Manage Roles
                           </Button>
                         </div>
@@ -1547,8 +1546,8 @@ export function Settings() {
                     </div>
 
                     {/* Users List */}
-                    <div className="p-3">
-                      <div className="space-y-2">
+                    <div className="p-6">
+                      <div className="space-y-4">
                         {users.length > 0 ? (
                           users.map((user, index) => (
                             <div
@@ -1657,216 +1656,7 @@ export function Settings() {
 
               {/* Database Settings Tab - Same as before, keeping it intact */}
               {activeTab === 'database' && (
-                <div className="space-y-3">
-                  {/* Supabase Cloud Mode Card */}
-                  <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-                    <div className="p-3 bg-gradient-to-r from-emerald-50 to-emerald-100 border-b border-emerald-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm">
-                            {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase ? (
-                              <Wifi className="w-3 h-3 text-white" />
-                            ) : (
-                              <HardDrive className="w-3 h-3 text-white" />
-                            )}
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-bold text-emerald-900">Cloud Storage Mode</h3>
-                            <p className="text-xs text-emerald-700">
-                              {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase 
-                                ? '☁️ Cloud Mode Active - Data saved to Supabase' 
-                                : '💾 Local Mode Active - Data saved to browser'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className={`px-2 py-1 rounded-lg font-semibold text-xs ${
-                          JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase 
-                            ? 'bg-emerald-500 text-white' 
-                            : 'bg-gray-200 text-gray-700'
-                        }`}>
-                          {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase ? 'CLOUD' : 'LOCAL'}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-3">
-                      <div className="space-y-2">
-                        <div className="flex items-start gap-2 p-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                          <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                          <div className="space-y-1">
-                            <p className="text-xs font-semibold text-blue-900">
-                              🚀 Aggressive Real-Time Cloud Sync Enabled
-                            </p>
-                            <ul className="text-xs text-blue-700 space-y-0.5 ml-3 list-disc">
-                              <li><strong>Instant Sync:</strong> Every add/edit/delete syncs to cloud immediately</li>
-                              <li><strong>Auto-Refresh:</strong> Data fetched on every page load, reload, and settings save</li>
-                              <li><strong>Background Sync:</strong> Bidirectional sync runs every 30 seconds automatically</li>
-                              <li><strong>Always Current:</strong> Your data is continuously synchronized with Supabase</li>
-                              <li><strong>Multi-Device:</strong> Access updated data from any device in real-time</li>
-                            </ul>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="flex items-center gap-3">
-                            {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase ? (
-                              <Wifi className="w-8 h-8 text-emerald-600" />
-                            ) : (
-                              <WifiOff className="w-8 h-8 text-gray-600" />
-                            )}
-                            <div>
-                              <p className="font-semibold text-gray-900">
-                                {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase 
-                                  ? 'Cloud Mode Enabled' 
-                                  : 'Cloud Mode Disabled'}
-                              </p>
-                              <p className="text-sm text-gray-600">
-                                {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase 
-                                  ? 'Your app is connected to Supabase' 
-                                  : 'Your app is using local storage only'}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            onClick={async () => {
-                              const currentSettings = JSON.parse(localStorage.getItem('skyway_settings') || '{}');
-                              const newSupabaseState = !currentSettings.useSupabase;
-                              
-                              if (newSupabaseState) {
-                                // Enabling Supabase - sync data to cloud
-                                showModal('confirm', 
-                                  'Enable Cloud Storage?', 
-                                  'This will upload all your local data (properties, customers, bookings, payments) to Supabase cloud storage.\n\nYour data will be accessible from anywhere with internet connection.\n\nDo you want to continue?',
-                                  async () => {
-                                    try {
-                                      // Import the sync function
-                                      const { syncToSupabase } = await import('../lib/data-service');
-                                      
-                                      // Show loading state
-                                      showModal('info', 'Syncing to Cloud...', 'Please wait while we upload your data to Supabase cloud storage...');
-                                      
-                                      // Sync data to Supabase
-                                      const result = await syncToSupabase();
-                                      
-                                      // Enable Supabase mode
-                                      const updatedSettings = { ...currentSettings, useSupabase: true };
-                                      
-                                      // Save settings to both localStorage and Supabase
-                                      const { saveSettings } = await import('../lib/data-service');
-                                      await saveSettings(updatedSettings);
-                                      window.dispatchEvent(new Event('settingsChanged'));
-                                      
-                                      logActivity('Cloud Mode Enabled', 'Supabase cloud storage activated and data synced');
-                                      
-                                      showModal('success', 
-                                        'Cloud Storage Enabled!', 
-                                        `✅ Successfully synced to Supabase!\n\n${result.counts?.properties || 0} properties\n${result.counts?.customers || 0} customers\n${result.counts?.bookings || 0} bookings\n${result.counts?.payments || 0} payments\n\nYour app is now fully cloud-based!`,
-                                        () => {
-                                          window.location.reload();
-                                        },
-                                        'Reload App'
-                                      );
-                                    } catch (error: any) {
-                                      console.error('Sync error:', error);
-                                      showModal('error', 'Sync Failed', `Failed to sync data to Supabase:\n\n${error.message}\n\nPlease check your internet connection and try again.`);
-                                    }
-                                  },
-                                  'Enable Cloud Storage',
-                                  'Cancel'
-                                );
-                              } else {
-                                // Disabling Supabase
-                                showModal('confirm', 
-                                  'Disable Cloud Storage?', 
-                                  'This will switch back to local storage mode.\n\nYour cloud data will remain in Supabase but the app will use local storage.\n\nYou can re-enable cloud mode anytime.\n\nContinue?',
-                                  async () => {
-                                    const updatedSettings = { ...currentSettings, useSupabase: false };
-                                    
-                                    // Save settings (will only save to localStorage since cloud mode is being disabled)
-                                    localStorage.setItem('skyway_settings', JSON.stringify(updatedSettings));
-                                    window.dispatchEvent(new Event('settingsChanged'));
-                                    logActivity('Cloud Mode Disabled', 'Switched back to local storage mode');
-                                    showModal('success', 'Cloud Storage Disabled', 'App switched to local storage mode successfully!', () => {
-                                      window.location.reload();
-                                    }, 'Reload App');
-                                  },
-                                  'Disable Cloud Storage',
-                                  'Cancel'
-                                );
-                              }
-                            }}
-                            className={`h-12 px-6 rounded-xl font-semibold shadow-md ${
-                              JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase
-                                ? 'bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white'
-                                : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white'
-                            }`}
-                          >
-                            {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase ? (
-                              <>
-                                <WifiOff className="w-4 h-4 mr-2" />
-                                Disable Cloud Storage
-                              </>
-                            ) : (
-                              <>
-                                <Wifi className="w-4 h-4 mr-2" />
-                                Enable Cloud Storage
-                              </>
-                            )}
-                          </Button>
-                        </div>
-
-                        {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase && (
-                          <div className="grid md:grid-cols-2 gap-4">
-                            <Button
-                              onClick={async () => {
-                                try {
-                                  showModal('info', 'Syncing...', 'Uploading latest data to Supabase cloud...');
-                                  const { syncToSupabase } = await import('../lib/data-service');
-                                  const result = await syncToSupabase();
-                                  logActivity('Data Synced', 'Manual sync to Supabase completed');
-                                  showModal('success', 'Sync Complete!', `Data uploaded to cloud successfully!\n\n${result.counts?.properties || 0} properties\n${result.counts?.customers || 0} customers\n${result.counts?.bookings || 0} bookings`);
-                                } catch (error: any) {
-                                  showModal('error', 'Sync Failed', `Failed to sync: ${error.message}`);
-                                }
-                              }}
-                              variant="outline"
-                              className="border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 rounded-xl h-12"
-                            >
-                              <Upload className="w-4 h-4 mr-2" />
-                              Upload to Cloud
-                            </Button>
-                            <Button
-                              onClick={async () => {
-                                try {
-                                  showModal('info', 'Downloading...', 'Fetching latest data from Supabase cloud...');
-                                  const { syncFromSupabase } = await import('../lib/data-service');
-                                  await syncFromSupabase();
-                                  logActivity('Data Downloaded', 'Manual download from Supabase completed');
-                                  showModal('success', 'Download Complete!', 'Latest data downloaded from cloud successfully!\n\nPage will reload to show updated data.', () => {
-                                    window.location.reload();
-                                  }, 'Reload');
-                                } catch (error: any) {
-                                  showModal('error', 'Download Failed', `Failed to download: ${error.message}`);
-                                }
-                              }}
-                              variant="outline"
-                              className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50 rounded-xl h-12"
-                            >
-                              <Download className="w-4 h-4 mr-2" />
-                              Download from Cloud
-                            </Button>
-                          </div>
-                        )}
-
-                        {/* Sync Statistics Display */}
-                        {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase && (
-                          <div className="mt-4">
-                            <SyncStatsDisplay />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
+                <div className="space-y-6">
                   {/* Backup and Restore Card */}
                   <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
                     <div className="p-6 bg-gradient-to-r from-purple-50 to-purple-100 border-b-2 border-purple-200">
@@ -2241,9 +2031,9 @@ export function Settings() {
                       <div className="pt-4 border-t-2 border-gray-100">
                         <Button 
                           onClick={handleSaveDbSettings}
-                          className="w-full md:w-auto bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 text-xs"
+                          className="w-full md:w-auto bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-6 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                         >
-                          <Save className="w-3 h-3 mr-1" />
+                          <Save className="w-5 h-5 mr-2" />
                           Save Database Settings
                         </Button>
                       </div>
@@ -2279,28 +2069,28 @@ export function Settings() {
 
               {/* SMS Integration Tab - Keeping as before */}
               {activeTab === 'sms' && (
-                <div className="space-y-3">
+                <div className="space-y-6">
                   {/* SMS Provider Card */}
-                  <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-                    <div className="p-3 bg-gradient-to-r from-orange-50 to-orange-100 border-b border-orange-200">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-sm">
-                          <MessageSquare className="w-3 h-3 text-white" />
+                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
+                    <div className="p-6 bg-gradient-to-r from-orange-50 to-orange-100 border-b-2 border-orange-200">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
+                          <MessageSquare className="w-5 h-5 text-white" />
                         </div>
-                        <h3 className="text-sm font-bold text-orange-900">SMS Provider</h3>
+                        <h3 className="text-xl font-bold text-orange-900">SMS Provider</h3>
                       </div>
                     </div>
-                    <div className="p-3 space-y-3">
+                    <div className="p-6 space-y-6">
                       {/* Provider Selection */}
-                      <div className="space-y-1">
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
                           Select Provider
                         </label>
                         <Select
                           value={smsProvider}
                           onValueChange={setSmsProvider}
                         >
-                          <SelectTrigger className="border border-gray-200 focus:border-orange-500 rounded-lg h-8 text-xs">
+                          <SelectTrigger className="border-2 border-gray-200 focus:border-orange-500 rounded-xl h-12">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -2312,18 +2102,18 @@ export function Settings() {
 
                       {/* Africa's Talking Settings */}
                       {smsProvider === 'africastalking' && (
-                        <div className="space-y-2 bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3 border border-green-200">
-                          <div className="flex items-center gap-1 mb-2">
-                            <div className="w-5 h-5 rounded-md bg-green-600 flex items-center justify-center">
-                              <MessageSquare className="w-3 h-3 text-white" />
+                        <div className="space-y-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border-2 border-green-200">
+                          <div className="flex items-center gap-2 mb-4">
+                            <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center">
+                              <MessageSquare className="w-4 h-4 text-white" />
                             </div>
-                            <h4 className="font-bold text-green-900 text-xs">Africa's Talking Settings</h4>
+                            <h4 className="font-bold text-green-900">Africa's Talking Settings</h4>
                           </div>
 
-                          <div className="space-y-2">
-                            <div className="space-y-1">
-                              <label className="flex items-center gap-1 text-xs font-semibold text-gray-700">
-                                <Shield className="w-3 h-3 text-green-600" />
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                                <Shield className="w-4 h-4 text-green-600" />
                                 API Key
                               </label>
                               <Input
@@ -2535,17 +2325,17 @@ export function Settings() {
                       <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t-2 border-gray-100">
                         <Button
                           onClick={handleSendCustomMessage}
-                          className="flex-1 bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 text-xs"
+                          className="flex-1 bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-6 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
                         >
-                          <Send className="w-3 h-3 mr-1" />
+                          <Send className="w-5 h-5 mr-2" />
                           Send Message
                         </Button>
                         <Button
                           onClick={handleSaveSmsSettings}
                           variant="outline"
-                          className="flex-1 border border-blue-500 text-blue-600 hover:bg-blue-50 font-semibold py-2 px-4 rounded-lg text-xs"
+                          className="flex-1 border-2 border-blue-500 text-blue-600 hover:bg-blue-50 font-semibold py-6 px-8 rounded-xl"
                         >
-                          <Save className="w-3 h-3 mr-1" />
+                          <Save className="w-5 h-5 mr-2" />
                           Save SMS Settings
                         </Button>
                       </div>

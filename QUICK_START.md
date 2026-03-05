@@ -347,5 +347,5 @@ You now have Skyway Suites running locally. Start building amazing property rent
 
 ---
 
-**Version**: 3.0  
+**Version**: 2.35  
 **Last Updated**: 2024

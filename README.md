@@ -467,9 +467,9 @@ Stored within booking objects as payments array
 
 ## 📌 Version Information
 
-**Current Version**: `3.0`
+**Current Version**: `2.35`
 
-All admin modules are standardized with version 3.0:
+All admin modules are standardized with version 2.35:
 - Admin Dashboard
 - Settings Module
 - Activity Log

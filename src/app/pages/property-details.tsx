@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
-import { saveBooking } from '../lib/realtime-data-manager';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Header } from '../components/header';
@@ -244,7 +243,7 @@ export function PropertyDetails() {
 
   const { days: calculatedDays, totalAmount: calculatedAmount } = calculateModalBookingDetails();
 
-  const handleAddBooking = async () => {
+  const handleAddBooking = () => {
     // Validate required fields
     if (!bookingForm.propertyId || !bookingForm.customerId || !bookingForm.checkIn || !bookingForm.checkOut) {
       showModal('error', 'Incomplete Information', 'Please fill in all required fields!');
@@ -312,10 +311,9 @@ export function PropertyDetails() {
       createdAt: new Date().toISOString()
     };
     
-    // Save using realtime data manager (syncs to cloud automatically)
-    await saveBooking(newBooking);
-    
+    // Save to localStorage
     const updatedBookings = [...bookings, newBooking];
+    localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
     setBookings(updatedBookings);
     
     // Log successful booking creation
