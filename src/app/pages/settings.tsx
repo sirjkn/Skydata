@@ -52,6 +52,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Header } from '../components/header';
 import { getCurrentUser } from '../lib/auth';
+import { SyncStatsDisplay } from '../components/sync-stats-display';
 
 type SettingsTab = 'general' | 'homepage' | 'users' | 'database' | 'sms';
 
@@ -1693,13 +1694,14 @@ export function Settings() {
                           <Info className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
                           <div className="space-y-2">
                             <p className="text-sm font-semibold text-blue-900">
-                              Enable Cloud Storage to make your app accessible from anywhere
+                              🚀 Aggressive Real-Time Cloud Sync Enabled
                             </p>
                             <ul className="text-sm text-blue-700 space-y-1 ml-4 list-disc">
-                              <li>All data saved to Supabase cloud database</li>
-                              <li>Access your data from any device with internet</li>
-                              <li>Automatic synchronization across devices</li>
-                              <li>Secure and scalable cloud infrastructure</li>
+                              <li><strong>Instant Sync:</strong> Every add/edit/delete syncs to cloud immediately</li>
+                              <li><strong>Auto-Refresh:</strong> Data fetched on every page load, reload, and settings save</li>
+                              <li><strong>Background Sync:</strong> Bidirectional sync runs every 5 seconds automatically</li>
+                              <li><strong>Always Current:</strong> Your data is continuously synchronized with Supabase</li>
+                              <li><strong>Multi-Device:</strong> Access updated data from any device in real-time</li>
                             </ul>
                           </div>
                         </div>
@@ -1747,7 +1749,11 @@ export function Settings() {
                                       
                                       // Enable Supabase mode
                                       const updatedSettings = { ...currentSettings, useSupabase: true };
-                                      localStorage.setItem('skyway_settings', JSON.stringify(updatedSettings));
+                                      
+                                      // Save settings to both localStorage and Supabase
+                                      const { saveSettings } = await import('../lib/data-service');
+                                      await saveSettings(updatedSettings);
+                                      window.dispatchEvent(new Event('settingsChanged'));
                                       
                                       logActivity('Cloud Mode Enabled', 'Supabase cloud storage activated and data synced');
                                       
@@ -1772,9 +1778,12 @@ export function Settings() {
                                 showModal('confirm', 
                                   'Disable Cloud Storage?', 
                                   'This will switch back to local storage mode.\n\nYour cloud data will remain in Supabase but the app will use local storage.\n\nYou can re-enable cloud mode anytime.\n\nContinue?',
-                                  () => {
+                                  async () => {
                                     const updatedSettings = { ...currentSettings, useSupabase: false };
+                                    
+                                    // Save settings (will only save to localStorage since cloud mode is being disabled)
                                     localStorage.setItem('skyway_settings', JSON.stringify(updatedSettings));
+                                    window.dispatchEvent(new Event('settingsChanged'));
                                     logActivity('Cloud Mode Disabled', 'Switched back to local storage mode');
                                     showModal('success', 'Cloud Storage Disabled', 'App switched to local storage mode successfully!', () => {
                                       window.location.reload();
@@ -1845,6 +1854,13 @@ export function Settings() {
                               <Download className="w-4 h-4 mr-2" />
                               Download from Cloud
                             </Button>
+                          </div>
+                        )}
+
+                        {/* Sync Statistics Display */}
+                        {JSON.parse(localStorage.getItem('skyway_settings') || '{}').useSupabase && (
+                          <div className="mt-4">
+                            <SyncStatsDisplay />
                           </div>
                         )}
                       </div>

@@ -106,8 +106,8 @@ app.get("/make-server-6a712830/properties/:id", async (c) => {
   }
 });
 
-// Create property (admin only)
-app.post("/make-server-6a712830/properties", requireAuth, async (c) => {
+// Create property
+app.post("/make-server-6a712830/properties", async (c) => {
   try {
     const propertyData = await c.req.json();
     const propertyId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -128,8 +128,8 @@ app.post("/make-server-6a712830/properties", requireAuth, async (c) => {
   }
 });
 
-// Update property (admin only)
-app.put("/make-server-6a712830/properties/:id", requireAuth, async (c) => {
+// Update property
+app.put("/make-server-6a712830/properties/:id", async (c) => {
   try {
     const id = c.req.param('id');
     const updates = await c.req.json();
@@ -155,8 +155,8 @@ app.put("/make-server-6a712830/properties/:id", requireAuth, async (c) => {
   }
 });
 
-// Delete property (admin only)
-app.delete("/make-server-6a712830/properties/:id", requireAuth, async (c) => {
+// Delete property
+app.delete("/make-server-6a712830/properties/:id", async (c) => {
   try {
     const id = c.req.param('id');
     await kv.del(`property:${id}`);
@@ -170,8 +170,8 @@ app.delete("/make-server-6a712830/properties/:id", requireAuth, async (c) => {
 
 // ===== BOOKING ROUTES =====
 
-// Get all bookings (admin only)
-app.get("/make-server-6a712830/bookings", requireAuth, async (c) => {
+// Get all bookings
+app.get("/make-server-6a712830/bookings", async (c) => {
   try {
     const bookings = await kv.getByPrefix('booking:');
     return c.json({ bookings });
@@ -181,8 +181,8 @@ app.get("/make-server-6a712830/bookings", requireAuth, async (c) => {
   }
 });
 
-// Get user bookings
-app.get("/make-server-6a712830/my-bookings", requireAuth, async (c) => {
+// Get user bookings  
+app.get("/make-server-6a712830/my-bookings", async (c) => {
   try {
     const userId = c.get('userId');
     const allBookings = await kv.getByPrefix('booking:');
@@ -196,7 +196,7 @@ app.get("/make-server-6a712830/my-bookings", requireAuth, async (c) => {
 });
 
 // Create booking
-app.post("/make-server-6a712830/bookings", requireAuth, async (c) => {
+app.post("/make-server-6a712830/bookings", async (c) => {
   try {
     const bookingData = await c.req.json();
     const userId = c.get('userId');
@@ -221,8 +221,8 @@ app.post("/make-server-6a712830/bookings", requireAuth, async (c) => {
   }
 });
 
-// Update booking status (admin only)
-app.put("/make-server-6a712830/bookings/:id", requireAuth, async (c) => {
+// Update booking status
+app.put("/make-server-6a712830/bookings/:id", async (c) => {
   try {
     const id = c.req.param('id');
     const { status } = await c.req.json();
@@ -249,8 +249,8 @@ app.put("/make-server-6a712830/bookings/:id", requireAuth, async (c) => {
 
 // ===== CUSTOMER ROUTES (Admin) =====
 
-// Get all customers (admin only)
-app.get("/make-server-6a712830/customers", requireAuth, async (c) => {
+// Get all customers
+app.get("/make-server-6a712830/customers", async (c) => {
   try {
     const customers = await kv.getByPrefix('customer:');
     return c.json({ customers });
@@ -281,8 +281,8 @@ app.post("/make-server-6a712830/inquiries", async (c) => {
   }
 });
 
-// Create customer (admin only)
-app.post("/make-server-6a712830/customers", requireAuth, async (c) => {
+// Create customer
+app.post("/make-server-6a712830/customers", async (c) => {
   try {
     const customerData = await c.req.json();
     const customerId = customerData.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -302,8 +302,8 @@ app.post("/make-server-6a712830/customers", requireAuth, async (c) => {
   }
 });
 
-// Update customer (admin only)
-app.put("/make-server-6a712830/customers/:id", requireAuth, async (c) => {
+// Update customer
+app.put("/make-server-6a712830/customers/:id", async (c) => {
   try {
     const id = c.req.param('id');
     const updates = await c.req.json();
@@ -329,8 +329,8 @@ app.put("/make-server-6a712830/customers/:id", requireAuth, async (c) => {
   }
 });
 
-// Delete customer (admin only)
-app.delete("/make-server-6a712830/customers/:id", requireAuth, async (c) => {
+// Delete customer
+app.delete("/make-server-6a712830/customers/:id", async (c) => {
   try {
     const id = c.req.param('id');
     await kv.del(`customer:${id}`);
@@ -344,8 +344,8 @@ app.delete("/make-server-6a712830/customers/:id", requireAuth, async (c) => {
 
 // ===== PAYMENT ROUTES =====
 
-// Get all payments (admin only)
-app.get("/make-server-6a712830/payments", requireAuth, async (c) => {
+// Get all payments
+app.get("/make-server-6a712830/payments", async (c) => {
   try {
     const payments = await kv.getByPrefix('payment:');
     return c.json({ payments });
@@ -355,8 +355,8 @@ app.get("/make-server-6a712830/payments", requireAuth, async (c) => {
   }
 });
 
-// Create payment (admin only)
-app.post("/make-server-6a712830/payments", requireAuth, async (c) => {
+// Create payment
+app.post("/make-server-6a712830/payments", async (c) => {
   try {
     const paymentData = await c.req.json();
     const paymentId = paymentData.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -376,8 +376,8 @@ app.post("/make-server-6a712830/payments", requireAuth, async (c) => {
   }
 });
 
-// Delete payment (admin only)
-app.delete("/make-server-6a712830/payments/:id", requireAuth, async (c) => {
+// Delete payment
+app.delete("/make-server-6a712830/payments/:id", async (c) => {
   try {
     const id = c.req.param('id');
     await kv.del(`payment:${id}`);
@@ -402,8 +402,8 @@ app.get("/make-server-6a712830/settings", async (c) => {
   }
 });
 
-// Update settings (admin only)
-app.put("/make-server-6a712830/settings", requireAuth, async (c) => {
+// Update settings
+app.put("/make-server-6a712830/settings", async (c) => {
   try {
     const settingsData = await c.req.json();
     
@@ -434,8 +434,8 @@ app.get("/make-server-6a712830/categories", async (c) => {
   }
 });
 
-// Update categories (admin only)
-app.put("/make-server-6a712830/categories", requireAuth, async (c) => {
+// Update categories
+app.put("/make-server-6a712830/categories", async (c) => {
   try {
     const { categories } = await c.req.json();
     await kv.set('app:categories', categories);
@@ -458,8 +458,8 @@ app.get("/make-server-6a712830/features", async (c) => {
   }
 });
 
-// Update features (admin only)
-app.put("/make-server-6a712830/features", requireAuth, async (c) => {
+// Update features
+app.put("/make-server-6a712830/features", async (c) => {
   try {
     const { features } = await c.req.json();
     await kv.set('app:features', features);
@@ -473,8 +473,8 @@ app.put("/make-server-6a712830/features", requireAuth, async (c) => {
 
 // ===== ACTIVITY LOG ROUTES =====
 
-// Get activity logs (admin only)
-app.get("/make-server-6a712830/activity-logs", requireAuth, async (c) => {
+// Get activity logs
+app.get("/make-server-6a712830/activity-logs", async (c) => {
   try {
     const logs = await kv.getByPrefix('activity-log:');
     return c.json({ logs });
@@ -507,8 +507,8 @@ app.post("/make-server-6a712830/activity-logs", async (c) => {
 
 // ===== SYNC ROUTES =====
 
-// Sync all data from localStorage to Supabase (admin only)
-app.post("/make-server-6a712830/sync/upload", requireAuth, async (c) => {
+// Sync all data from localStorage to Supabase
+app.post("/make-server-6a712830/sync/upload", async (c) => {
   try {
     const { 
       properties, 

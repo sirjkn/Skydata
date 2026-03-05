@@ -426,82 +426,69 @@ export function AdminDashboard() {
     { id: 'settings', label: 'Settings', icon: Settings, active: true }
   ];
 
-  // Load categories and features from localStorage
+  // Load all data from realtime data manager (automatically uses localStorage or Supabase based on settings)
   useEffect(() => {
-    const savedCategories = localStorage.getItem('skyway_categories');
-    const savedFeatures = localStorage.getItem('skyway_features');
-    const savedProperties = localStorage.getItem('skyway_properties');
-    const savedBookings = localStorage.getItem('skyway_bookings');
-    const savedCustomers = localStorage.getItem('skyway_customers');
-    const savedLogs = localStorage.getItem('skyway_activity_logs');
+    const loadAllData = async () => {
+      try {
+        const { getFreshCategories, getFreshFeatures, getFreshProperties, getFreshBookings, getFreshCustomers, getFreshActivityLogs } = await import('../lib/realtime-data-manager');
+        
+        const [categories, features, properties, bookings, customers, logs] = await Promise.all([
+          getFreshCategories(),
+          getFreshFeatures(),
+          getFreshProperties(),
+          getFreshBookings(),
+          getFreshCustomers(),
+          getFreshActivityLogs()
+        ]);
+        
+        setCategories(categories || []);
+        setFeatures(features || []);
+        setProperties(properties || []);
+        setBookings(bookings || []);
+        setCustomers(customers || []);
+        setActivityLogs(logs || []);
+        
+        // Check if any properties need image migration
+        if (properties && properties.length > 0) {
+          const needsMigration = properties.some((prop: any) => {
+            if (!prop.photos) return false;
+            return Object.values(prop.photos).some((photoArray: any) => 
+              photoArray.some((photo: string) => {
+                const sizeKB = (photo.length * 0.75) / 1024;
+                const isWebP = photo.startsWith('data:image/webp');
+                return !isWebP || sizeKB > 55;
+              })
+            );
+          });
+          setShowMigrationButton(needsMigration);
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+        // Fallback to empty arrays
+        setCategories([]);
+        setFeatures([]);
+        setProperties([]);
+        setBookings([]);
+        setCustomers([]);
+        setActivityLogs([]);
+      }
+    };
     
-    if (savedCategories) {
-      setCategories(JSON.parse(savedCategories));
-    } else {
-      // Start with empty categories
-      setCategories([]);
-    }
-    
-    if (savedFeatures) {
-      setFeatures(JSON.parse(savedFeatures));
-    } else {
-      // Start with empty features
-      setFeatures([]);
-    }
-    
-    if (savedProperties) {
-      const parsedProperties = JSON.parse(savedProperties);
-      setProperties(parsedProperties);
-      
-      // Check if any properties need image migration
-      const needsMigration = parsedProperties.some((prop: any) => {
-        if (!prop.photos) return false;
-        // Check if any photo is not WebP or larger than 55KB (allowing some buffer)
-        return Object.values(prop.photos).some((photoArray: any) => 
-          photoArray.some((photo: string) => {
-            // Check if it's base64 and estimate size
-            const sizeKB = (photo.length * 0.75) / 1024;
-            const isWebP = photo.startsWith('data:image/webp');
-            return !isWebP || sizeKB > 55; // 55KB buffer for 50KB target
-          })
-        );
-      });
-      
-      setShowMigrationButton(needsMigration);
-    } else {
-      // Start with empty properties
-      setProperties([]);
-    }
-
-    if (savedBookings) {
-      setBookings(JSON.parse(savedBookings));
-    } else {
-      // Start with empty bookings
-      setBookings([]);
-    }
-
-    if (savedCustomers) {
-      setCustomers(JSON.parse(savedCustomers));
-    } else {
-      // Start with empty customers
-      setCustomers([]);
-    }
-
-    if (savedLogs) {
-      setActivityLogs(JSON.parse(savedLogs));
-    }
+    loadAllData();
   }, []);
 
   // Real-time sync for bookings - reload whenever we switch to relevant menus or periodically
   useEffect(() => {
     if (activeMenu === 'overview' || activeMenu === 'properties' || activeMenu === 'bookings') {
-      const loadBookings = () => {
-        const savedBookings = localStorage.getItem('skyway_bookings');
-        if (savedBookings) {
-          const parsedBookings = JSON.parse(savedBookings);
-          setBookings(parsedBookings);
+      const loadBookings = async () => {
+        try {
+          const { getFreshBookings } = await import('../lib/realtime-data-manager');
+          const bookings = await getFreshBookings();
+          setBookings(bookings || []);
           // Increment refresh key to force component re-renders
           setBookingsRefreshKey(prev => prev + 1);
+        } catch (error) {
+          console.error('Error loading bookings:', error);
         }
       };
 
@@ -633,22 +620,30 @@ export function AdminDashboard() {
   };
 
   // Handle Add Category
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     if (newCategory.trim() && !categories.includes(newCategory.trim())) {
       const updatedCategories = [...categories, newCategory.trim()];
       setCategories(updatedCategories);
-      localStorage.setItem('skyway_categories', JSON.stringify(updatedCategories));
+      
+      // Save using data service (real-time to Supabase or localStorage)
+      const { setCategories: saveCategories } = await import('../lib/realtime-data-manager');
+      await saveCategories(updatedCategories);
+      
       setNewCategory('');
       setShowCategoryModal(false);
     }
   };
 
   // Handle Add Feature
-  const handleAddFeature = () => {
+  const handleAddFeature = async () => {
     if (newFeature.trim() && !features.includes(newFeature.trim())) {
       const updatedFeatures = [...features, newFeature.trim()];
       setFeatures(updatedFeatures);
-      localStorage.setItem('skyway_features', JSON.stringify(updatedFeatures));
+      
+      // Save using data service (real-time to Supabase or localStorage)
+      const { setFeatures: saveFeatures } = await import('../lib/realtime-data-manager');
+      await saveFeatures(updatedFeatures);
+      
       setNewFeature('');
       setShowFeatureModal(false);
     }
@@ -1042,7 +1037,7 @@ export function AdminDashboard() {
   };
 
   // Handle Add Property Submit
-  const handleAddPropertySubmit = () => {
+  const handleAddPropertySubmit = async () => {
     // Validate form
     if (!propertyForm.name || !propertyForm.category || !propertyForm.location || !propertyForm.price) {
       showModal('error', 'Missing Fields', 'Please fill in all required fields');
@@ -1050,8 +1045,9 @@ export function AdminDashboard() {
     }
 
     try {
-      // Get existing properties
-      const existingProperties = JSON.parse(localStorage.getItem('skyway_properties') || '[]');
+      // Get existing properties using data service
+      const { getProperties, saveProperty } = await import('../lib/data-service');
+      const existingProperties = await getProperties();
       
       // Create new property
       const newProperty = {
@@ -1116,7 +1112,7 @@ export function AdminDashboard() {
   };
 
   // Handle Edit Property Submit
-  const handleEditPropertySubmit = () => {
+  const handleEditPropertySubmit = async () => {
     // Validate form
     if (!propertyForm.name || !propertyForm.category || !propertyForm.location || !propertyForm.price) {
       showModal('error', 'Validation Error', 'Please fill in all required fields');
@@ -1124,8 +1120,9 @@ export function AdminDashboard() {
     }
 
     try {
-      // Get existing properties
-      const existingProperties = JSON.parse(localStorage.getItem('skyway_properties') || '[]');
+      // Get existing properties using data service
+      const { getProperties, saveProperty } = await import('../lib/realtime-data-manager');
+      const existingProperties = await getProperties();
       
       // Update the property
       const updatedProperties = existingProperties.map((prop: any) => {
@@ -1193,7 +1190,7 @@ export function AdminDashboard() {
   };
 
   // Handle Add Customer
-  const handleAddCustomer = () => {
+  const handleAddCustomer = async () => {
     if (customerForm.name.trim()) {
       const newCustomer = {
         id: Date.now().toString(),
@@ -1205,9 +1202,12 @@ export function AdminDashboard() {
         createdAt: new Date().toISOString()
       };
       
+      // Save using realtime data manager (to database and state)
+      const { saveCustomer } = await import('../lib/realtime-data-manager');
+      await saveCustomer(newCustomer);
+      
       const updatedCustomers = [...customers, newCustomer];
       setCustomers(updatedCustomers);
-      localStorage.setItem('skyway_customers', JSON.stringify(updatedCustomers));
       
       // Reset form
       setCustomerForm({
@@ -1224,11 +1224,14 @@ export function AdminDashboard() {
   };
 
   // Handle Delete Customer
-  const handleDeleteCustomer = () => {
+  const handleDeleteCustomer = async () => {
     if (selectedCustomer) {
+      // Delete using realtime data manager (from database and state)
+      const { deleteCustomer } = await import('../lib/realtime-data-manager');
+      await deleteCustomer(selectedCustomer.id);
+      
       const updatedCustomers = customers.filter(c => c.id !== selectedCustomer.id);
       setCustomers(updatedCustomers);
-      localStorage.setItem('skyway_customers', JSON.stringify(updatedCustomers));
       setShowDeleteCustomerConfirm(false);
       setSelectedCustomer(null);
       showModal('success', 'Success', 'Customer deleted successfully!');
@@ -1236,7 +1239,7 @@ export function AdminDashboard() {
   };
 
   // Handle Add Booking
-  const handleAddBooking = () => {
+  const handleAddBooking = async () => {
     /**
      * ADD BOOKING FLOW - Complete Documentation
      * =========================================
@@ -1335,9 +1338,11 @@ export function AdminDashboard() {
       createdAt: new Date().toISOString()
     };
 
-    // Save to localStorage
+    // Save using realtime data manager (to database and state)
+    const { saveBooking } = await import('../lib/realtime-data-manager');
+    await saveBooking(newBooking);
+    
     const updatedBookings = [...bookings, newBooking];
-    localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
     setBookings(updatedBookings);
     setBookingsRefreshKey(prev => prev + 1);
 
@@ -2060,15 +2065,18 @@ export function AdminDashboard() {
                                 <>
                                   <Button
                                     size="sm"
-                                    onClick={() => {
+                                    onClick={async () => {
                                       // Approve booking
+                                      const updatedBooking = { ...booking, status: 'Confirmed' };
+                                      
+                                      // Save using realtime data manager (to database and state)
+                                      const { saveBooking } = await import('../lib/realtime-data-manager');
+                                      await saveBooking(updatedBooking);
+                                      
                                       const updatedBookings = bookings.map((b) =>
-                                        b.id === booking.id
-                                          ? { ...b, status: 'Confirmed' }
-                                          : b
+                                        b.id === booking.id ? updatedBooking : b
                                       );
                                       setBookings(updatedBookings);
-                                      localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
                                       
                                       // SMS Notification Logic
                                       const smsSettings = JSON.parse(localStorage.getItem('skyway_sms_settings') || '{}');
@@ -2096,14 +2104,17 @@ export function AdminDashboard() {
                                     size="sm"
                                     onClick={() => {
                                       // Disapprove booking
-                                      showModal('confirm', 'Disapprove Booking', 'Are you sure you want to disapprove this booking? This will cancel the booking.', () => {
+                                      showModal('confirm', 'Disapprove Booking', 'Are you sure you want to disapprove this booking? This will cancel the booking.', async () => {
+                                        const updatedBooking = { ...booking, status: 'Cancelled', cancelReason: 'Disapproved by admin' };
+                                        
+                                        // Save using realtime data manager (to database and state)
+                                        const { saveBooking } = await import('../lib/realtime-data-manager');
+                                        await saveBooking(updatedBooking);
+                                        
                                         const updatedBookings = bookings.map((b) =>
-                                          b.id === booking.id
-                                            ? { ...b, status: 'Cancelled', cancelReason: 'Disapproved by admin' }
-                                            : b
+                                          b.id === booking.id ? updatedBooking : b
                                         );
                                         setBookings(updatedBookings);
-                                        localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
                                         showModal('success', 'Booking Disapproved', 'Booking disapproved and cancelled.');
                                       }, 'Disapprove', 'Cancel');
                                     }}
@@ -2657,10 +2668,13 @@ export function AdminDashboard() {
                     <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                       <span className="text-sm font-medium text-[#36454F]">{category}</span>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           const updatedCategories = categories.filter((_, i) => i !== index);
                           setCategories(updatedCategories);
-                          localStorage.setItem('skyway_categories', JSON.stringify(updatedCategories));
+                          
+                          // Save using realtime data manager (to database and state)
+                          const { setCategories: saveCategories } = await import('../lib/realtime-data-manager');
+                          await saveCategories(updatedCategories);
                         }}
                         className="text-red-600 hover:text-red-700 p-1"
                       >
@@ -2731,10 +2745,13 @@ export function AdminDashboard() {
                     <div key={index} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                       <span className="text-sm font-medium text-[#36454F]">{feature}</span>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           const updatedFeatures = features.filter((_, i) => i !== index);
                           setFeatures(updatedFeatures);
-                          localStorage.setItem('skyway_features', JSON.stringify(updatedFeatures));
+                          
+                          // Save using realtime data manager (to database and state)
+                          const { setFeatures: saveFeatures } = await import('../lib/realtime-data-manager');
+                          await saveFeatures(updatedFeatures);
                         }}
                         className="text-red-600 hover:text-red-700 p-1"
                       >
@@ -3515,7 +3532,7 @@ export function AdminDashboard() {
             {/* Action Buttons */}
             <div className="flex gap-3 mt-6">
               <Button
-                onClick={() => {
+                onClick={async () => {
                   // Validate form
                   if (!paymentForm.totalAmount) {
                     showModal('error', 'Validation Error', 'Please enter total amount');
@@ -3561,9 +3578,13 @@ export function AdminDashboard() {
                     return booking;
                   });
 
-                  // Save updated bookings to localStorage
+                  // Save updated booking using realtime data manager (to database and state)
+                  const { saveBooking, savePayment } = await import('../lib/realtime-data-manager');
+                  const updatedBooking = updatedBookings.find(b => b.id === selectedBooking.id);
+                  if (updatedBooking) {
+                    await saveBooking(updatedBooking);
+                  }
                   setBookings(updatedBookings);
-                  localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
 
                   // Also save to the separate payments store with full details
                   const legacyPayment = {
@@ -3582,8 +3603,9 @@ export function AdminDashboard() {
                     transactionId: paymentForm.transactionId,
                     createdAt: payment.date
                   };
-                  const existingPayments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
-                  localStorage.setItem('skyway_payments', JSON.stringify([...existingPayments, legacyPayment]));
+                  
+                  // Save payment using realtime data manager (to database and state)
+                  await savePayment(legacyPayment);
 
                   // Reset form
                   setPaymentForm({
@@ -3668,20 +3690,27 @@ export function AdminDashboard() {
 
             <div className="flex gap-3">
               <Button
-                onClick={() => {
+                onClick={async () => {
                   if (!cancelReason.trim()) {
                     showModal('error', 'Validation Error', 'Please provide a reason for cancellation');
                     return;
                   }
 
                   // Update booking status to Cancelled
-                  const updatedBookings = bookings.map(b => 
-                    b.id === selectedBooking.id 
-                      ? { ...b, status: 'Cancelled', cancelReason: cancelReason, cancelledAt: new Date().toISOString() }
-                      : b
-                  );
+                  const updatedBooking = { 
+                    ...selectedBooking, 
+                    status: 'Cancelled', 
+                    cancelReason: cancelReason, 
+                    cancelledAt: new Date().toISOString() 
+                  };
                   
-                  localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
+                  // Save using realtime data manager (to database and state)
+                  const { saveBooking } = await import('../lib/realtime-data-manager');
+                  await saveBooking(updatedBooking);
+                  
+                  const updatedBookings = bookings.map(b => 
+                    b.id === selectedBooking.id ? updatedBooking : b
+                  );
                   setBookings(updatedBookings);
                   
                   setShowCancelConfirm(false);
@@ -3855,10 +3884,12 @@ export function AdminDashboard() {
 
             <div className="flex gap-3">
               <Button
-                onClick={() => {
-                  // Delete booking
+                onClick={async () => {
+                  // Delete booking using realtime data manager (from database and state)
+                  const { deleteBooking } = await import('../lib/realtime-data-manager');
+                  await deleteBooking(selectedBooking.id);
+                  
                   const updatedBookings = bookings.filter(b => b.id !== selectedBooking.id);
-                  localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
                   setBookings(updatedBookings);
                   
                   setShowDeleteConfirm(false);
@@ -5101,27 +5132,28 @@ export function AdminDashboard() {
 
             <div className="flex gap-3">
               <Button
-                onClick={() => {
-                  // Remove payment from skyway_payments
-                  const existingPayments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
-                  const updatedPayments = existingPayments.filter((p: any) => p.id !== selectedPayment.id);
-                  localStorage.setItem('skyway_payments', JSON.stringify(updatedPayments));
+                onClick={async () => {
+                  // Delete payment using realtime data manager (from database and state)
+                  const { deletePayment, saveBooking } = await import('../lib/realtime-data-manager');
+                  await deletePayment(selectedPayment.id);
 
                   // Remove payment from the booking's payments array
                   const updatedBookings = bookings.map(booking => {
                     if (booking.id === selectedPayment.bookingId) {
                       const updatedBookingPayments = (booking.payments || []).filter((p: any) => p.id !== selectedPayment.id);
-                      return {
+                      const updatedBooking = {
                         ...booking,
                         payments: updatedBookingPayments
                       };
+                      // Save updated booking
+                      saveBooking(updatedBooking);
+                      return updatedBooking;
                     }
                     return booking;
                   });
 
-                  // Update bookings state and localStorage
+                  // Update bookings state
                   setBookings(updatedBookings);
-                  localStorage.setItem('skyway_bookings', JSON.stringify(updatedBookings));
 
                   // Trigger refresh
                   setPaymentsRefreshKey(prev => prev + 1);

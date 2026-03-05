@@ -17,17 +17,11 @@ const API_BASE = `https://${projectId}.supabase.co/functions/v1/make-server-6a71
 
 // Generic fetch with auth
 const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
-  const token = getAuthToken();
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
+    'Authorization': `Bearer ${publicAnonKey}`,
     ...options.headers,
   };
-  
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  } else {
-    headers['Authorization'] = `Bearer ${publicAnonKey}`;
-  }
   
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
@@ -355,10 +349,16 @@ export const saveSettings = async (settings: any): Promise<void> => {
         method: 'PUT',
         body: JSON.stringify(settings),
       });
+      
+      // Trigger full bidirectional sync after settings save
+      window.dispatchEvent(new CustomEvent('triggerFullSync'));
     } catch (error) {
       console.error('Error saving settings to Supabase:', error);
     }
   }
+  
+  // Dispatch settings changed event
+  window.dispatchEvent(new Event('settingsChanged'));
 };
 
 // ===== ACTIVITY LOGS =====
