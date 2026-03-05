@@ -27,7 +27,7 @@ import { getCurrentUser } from '../lib/auth';
 import { CustomModal } from '../components/custom-modal';
 
 // App version - keep consistent across all modules
-const APP_VERSION = '2.35';
+const APP_VERSION = '3.0';
 
 interface ActivityLog {
   id: string;

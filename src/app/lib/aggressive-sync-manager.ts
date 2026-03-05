@@ -82,10 +82,25 @@ export const bidirectionalSync = async (): Promise<void> => {
     await dataService.syncFromSupabase();
     console.log('✅ Download complete');
 
+    // Step 3: Dispatch event to notify app of data changes
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new CustomEvent('dataUpdated'));
+
     console.log('✨ Bidirectional sync successful!');
     notifyListeners('success');
   } catch (error) {
-    console.error('❌ Bidirectional sync failed:', error);
+    // Log detailed error but don't crash the app
+    if (error instanceof Error) {
+      console.error('❌ Bidirectional sync failed:', error.message);
+      
+      // Check if it's a connection error
+      if (error.message.includes('Cannot connect') || error.message.includes('timeout')) {
+        console.warn('⚠️ Supabase server appears to be unavailable. Data will remain local until connection is restored.');
+        console.warn('💡 To deploy the server, visit: https://supabase.com/dashboard/project/zqnvycenohyyyxnnelbc/functions');
+      }
+    } else {
+      console.error('❌ Bidirectional sync failed:', error);
+    }
     notifyListeners('error');
   } finally {
     isSyncing = false;
@@ -104,6 +119,12 @@ export const quickUploadSync = async (): Promise<void> => {
   try {
     await dataService.syncToSupabase();
   } catch (error) {
+    // Silently fail for quick syncs to avoid noise
+    // Full bidirectional sync will show detailed errors
+    if (error instanceof Error && error.message.includes('Cannot connect')) {
+      // Server not available, skip silently
+      return;
+    }
     console.error('Quick upload sync failed:', error);
   }
 };

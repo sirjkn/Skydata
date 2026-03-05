@@ -38,7 +38,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
 // App version - keep consistent across all modules
-const APP_VERSION = '2.35';
+const APP_VERSION = '3.0';
 
 /**
  * =============================================================================
@@ -925,9 +925,10 @@ export function AdminDashboard() {
         console.log(`✓ Completed property ${processedProperties}/${totalProperties}: ${property.name}`);
       }
 
-      // Save migrated properties
+      // Save migrated properties using realtime data manager
       try {
-        localStorage.setItem('skyway_properties', JSON.stringify(migratedProperties));
+        const { setProperties: savePropertiesToCloud } = await import('../lib/realtime-data-manager');
+        await savePropertiesToCloud(migratedProperties);
         setProperties(migratedProperties);
         setShowMigrationButton(false);
         
@@ -1045,8 +1046,8 @@ export function AdminDashboard() {
     }
 
     try {
-      // Get existing properties using data service
-      const { getProperties, saveProperty } = await import('../lib/data-service');
+      // Get existing properties using realtime data manager
+      const { getProperties, saveProperty } = await import('../lib/realtime-data-manager');
       const existingProperties = await getProperties();
       
       // Create new property
@@ -1066,11 +1067,9 @@ export function AdminDashboard() {
         createdAt: new Date().toISOString()
       };
 
-      // Save to localStorage with error handling
-      const updatedProperties = [...existingProperties, newProperty];
-      
+      // Save new property using realtime data manager (syncs to cloud automatically)
       try {
-        localStorage.setItem('skyway_properties', JSON.stringify(updatedProperties));
+        await saveProperty(newProperty);
       } catch (storageError: any) {
         if (storageError.name === 'QuotaExceededError') {
           showModal('error', 'Storage Quota Exceeded', 'All images are compressed to WebP (max 50KB each), but you still need to:\n\n1. Reduce photos (current: ' + Object.values(photos).reduce((sum, arr) => sum + arr.length, 0) + ', recommended: 5-10)\n2. Delete old/unused properties\n3. Clear browser cache\n\nNote: Each photo is automatically optimized to ~50KB.');
@@ -1080,6 +1079,7 @@ export function AdminDashboard() {
       }
       
       // Update state to show new property immediately
+      const updatedProperties = [...existingProperties, newProperty];
       setProperties(updatedProperties);
 
       // Reset form
@@ -1145,9 +1145,10 @@ export function AdminDashboard() {
         return prop;
       });
 
-      // Save to localStorage with error handling
+      // Save updated property using realtime data manager (syncs to cloud automatically)
+      const updatedProperty = updatedProperties.find((p: any) => p.id === editingProperty.id);
       try {
-        localStorage.setItem('skyway_properties', JSON.stringify(updatedProperties));
+        await saveProperty(updatedProperty);
       } catch (storageError: any) {
         if (storageError.name === 'QuotaExceededError') {
           showModal('error', 'Storage Quota Exceeded', 'All images are compressed to WebP (max 50KB each), but you still need to:\n\n1. Reduce photos (current: ' + Object.values(photos).reduce((sum, arr) => sum + arr.length, 0) + ', recommended: 5-10)\n2. Delete old/unused properties\n3. Clear browser cache\n\nNote: Each photo is automatically optimized to ~50KB.');

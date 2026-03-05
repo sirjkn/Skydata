@@ -56,7 +56,7 @@ import { SyncStatsDisplay } from '../components/sync-stats-display';
 
 type SettingsTab = 'general' | 'homepage' | 'users' | 'database' | 'sms';
 
-const APP_VERSION = '2.35'; // Format: Version 235 = 2.35
+const APP_VERSION = '3.0'; // Format: Version 3.0
 
 export function Settings() {
   const navigate = useNavigate();

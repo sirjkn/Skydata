@@ -791,5 +791,5 @@ Frontend (React) ←→ API Gateway ←→ Backend (Node.js/Express)
 
 ---
 
-**Architecture Version**: 2.35  
+**Architecture Version**: 3.0  
 **Last Updated**: 2024

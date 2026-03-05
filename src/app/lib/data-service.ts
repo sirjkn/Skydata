@@ -17,37 +17,64 @@ const API_BASE = `https://${projectId}.supabase.co/functions/v1/make-server-6a71
 
 // Generic fetch with auth
 const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${publicAnonKey}`,
-    ...options.headers,
-  };
-  
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers,
-  });
-  
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+  try {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${publicAnonKey}`,
+      ...options.headers,
+    };
+    
+    // Increase timeout for sync operations which can take longer with large datasets
+    const timeoutMs = endpoint.includes('/sync/') ? 120000 : 30000; // 2 minutes for sync, 30s for others
+    
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(error.error || error.details || `HTTP ${response.status}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    // If fetch fails completely (network error, timeout, etc), throw a clear error
+    if (error instanceof Error) {
+      if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+        throw new Error('Request timeout - This usually happens with large amounts of data. Try syncing again.');
+      } else if (error.message.includes('Failed to fetch')) {
+        throw new Error('Cannot connect to Supabase - check your internet connection or server deployment');
+      }
+      throw error;
+    }
+    throw new Error('Unknown network error');
   }
-  
-  return response.json();
 };
 
 // ===== PROPERTIES =====
 
 export const getProperties = async (): Promise<any[]> => {
-  if (isSupabaseEnabled()) {
-    const data = await fetchWithAuth('/properties');
-    return data.properties || [];
-  } else {
-    return JSON.parse(localStorage.getItem('skyway_properties') || '[]');
-  }
+  // ALWAYS read from localStorage (source of truth for UI)
+  // Supabase is just a sync backup, not the primary data source
+  return JSON.parse(localStorage.getItem('skyway_properties') || '[]');
 };
 
 export const saveProperty = async (property: any): Promise<void> => {
+  // ALWAYS update localStorage first (source of truth for UI)
+  const properties = JSON.parse(localStorage.getItem('skyway_properties') || '[]');
+  const existingIndex = properties.findIndex((p: any) => p.id === property.id);
+  
+  if (existingIndex >= 0) {
+    properties[existingIndex] = property;
+  } else {
+    properties.push(property);
+  }
+  
+  localStorage.setItem('skyway_properties', JSON.stringify(properties));
+  
+  // THEN sync to Supabase if enabled
   if (isSupabaseEnabled()) {
     if (property.id && property.id !== '') {
       // Update existing
@@ -62,55 +89,58 @@ export const saveProperty = async (property: any): Promise<void> => {
         body: JSON.stringify(property),
       });
     }
-  } else {
-    const properties = JSON.parse(localStorage.getItem('skyway_properties') || '[]');
-    const existingIndex = properties.findIndex((p: any) => p.id === property.id);
-    
-    if (existingIndex >= 0) {
-      properties[existingIndex] = property;
-    } else {
-      properties.push(property);
-    }
-    
-    localStorage.setItem('skyway_properties', JSON.stringify(properties));
   }
 };
 
 export const deleteProperty = async (id: string | number): Promise<void> => {
+  // ALWAYS delete from localStorage first (source of truth for UI)
+  const properties = JSON.parse(localStorage.getItem('skyway_properties') || '[]');
+  const filtered = properties.filter((p: any) => p.id !== id);
+  localStorage.setItem('skyway_properties', JSON.stringify(filtered));
+  
+  // THEN delete from Supabase if enabled
   if (isSupabaseEnabled()) {
     await fetchWithAuth(`/properties/${id}`, {
       method: 'DELETE',
     });
-  } else {
-    const properties = JSON.parse(localStorage.getItem('skyway_properties') || '[]');
-    const filtered = properties.filter((p: any) => p.id !== id);
-    localStorage.setItem('skyway_properties', JSON.stringify(filtered));
   }
 };
 
 export const setProperties = async (properties: any[]): Promise<void> => {
+  // ALWAYS update localStorage first (source of truth for UI)
+  localStorage.setItem('skyway_properties', JSON.stringify(properties));
+  
+  // THEN sync to Supabase if enabled
   if (isSupabaseEnabled()) {
     // Batch save all properties
     for (const property of properties) {
       await saveProperty(property);
     }
-  } else {
-    localStorage.setItem('skyway_properties', JSON.stringify(properties));
   }
 };
 
 // ===== CUSTOMERS =====
 
 export const getCustomers = async (): Promise<any[]> => {
-  if (isSupabaseEnabled()) {
-    const data = await fetchWithAuth('/customers');
-    return data.customers || [];
-  } else {
-    return JSON.parse(localStorage.getItem('skyway_customers') || '[]');
-  }
+  // ALWAYS read from localStorage (source of truth for UI)
+  // Supabase is just a sync backup, not the primary data source
+  return JSON.parse(localStorage.getItem('skyway_customers') || '[]');
 };
 
 export const saveCustomer = async (customer: any): Promise<void> => {
+  // ALWAYS update localStorage first (source of truth for UI)
+  const customers = JSON.parse(localStorage.getItem('skyway_customers') || '[]');
+  const existingIndex = customers.findIndex((c: any) => c.id === customer.id);
+  
+  if (existingIndex >= 0) {
+    customers[existingIndex] = customer;
+  } else {
+    customers.push(customer);
+  }
+  
+  localStorage.setItem('skyway_customers', JSON.stringify(customers));
+  
+  // THEN sync to Supabase if enabled
   if (isSupabaseEnabled()) {
     if (customer.id && customer.id !== '') {
       await fetchWithAuth(`/customers/${customer.id}`, {
@@ -123,54 +153,57 @@ export const saveCustomer = async (customer: any): Promise<void> => {
         body: JSON.stringify(customer),
       });
     }
-  } else {
-    const customers = JSON.parse(localStorage.getItem('skyway_customers') || '[]');
-    const existingIndex = customers.findIndex((c: any) => c.id === customer.id);
-    
-    if (existingIndex >= 0) {
-      customers[existingIndex] = customer;
-    } else {
-      customers.push(customer);
-    }
-    
-    localStorage.setItem('skyway_customers', JSON.stringify(customers));
   }
 };
 
 export const deleteCustomer = async (id: string | number): Promise<void> => {
+  // ALWAYS delete from localStorage first (source of truth for UI)
+  const customers = JSON.parse(localStorage.getItem('skyway_customers') || '[]');
+  const filtered = customers.filter((c: any) => c.id !== id);
+  localStorage.setItem('skyway_customers', JSON.stringify(filtered));
+  
+  // THEN delete from Supabase if enabled
   if (isSupabaseEnabled()) {
     await fetchWithAuth(`/customers/${id}`, {
       method: 'DELETE',
     });
-  } else {
-    const customers = JSON.parse(localStorage.getItem('skyway_customers') || '[]');
-    const filtered = customers.filter((c: any) => c.id !== id);
-    localStorage.setItem('skyway_customers', JSON.stringify(filtered));
   }
 };
 
 export const setCustomers = async (customers: any[]): Promise<void> => {
+  // ALWAYS update localStorage first (source of truth for UI)
+  localStorage.setItem('skyway_customers', JSON.stringify(customers));
+  
+  // THEN sync to Supabase if enabled
   if (isSupabaseEnabled()) {
     for (const customer of customers) {
       await saveCustomer(customer);
     }
-  } else {
-    localStorage.setItem('skyway_customers', JSON.stringify(customers));
   }
 };
 
 // ===== BOOKINGS =====
 
 export const getBookings = async (): Promise<any[]> => {
-  if (isSupabaseEnabled()) {
-    const data = await fetchWithAuth('/bookings');
-    return data.bookings || [];
-  } else {
-    return JSON.parse(localStorage.getItem('skyway_bookings') || '[]');
-  }
+  // ALWAYS read from localStorage (source of truth for UI)
+  // Supabase is just a sync backup, not the primary data source
+  return JSON.parse(localStorage.getItem('skyway_bookings') || '[]');
 };
 
 export const saveBooking = async (booking: any): Promise<void> => {
+  // ALWAYS update localStorage first (source of truth for UI)
+  const bookings = JSON.parse(localStorage.getItem('skyway_bookings') || '[]');
+  const existingIndex = bookings.findIndex((b: any) => b.id === booking.id);
+  
+  if (existingIndex >= 0) {
+    bookings[existingIndex] = booking;
+  } else {
+    bookings.push(booking);
+  }
+  
+  localStorage.setItem('skyway_bookings', JSON.stringify(bookings));
+  
+  // THEN sync to Supabase if enabled
   if (isSupabaseEnabled()) {
     if (booking.id && booking.id !== '') {
       await fetchWithAuth(`/bookings/${booking.id}`, {
@@ -183,140 +216,139 @@ export const saveBooking = async (booking: any): Promise<void> => {
         body: JSON.stringify(booking),
       });
     }
-  } else {
-    const bookings = JSON.parse(localStorage.getItem('skyway_bookings') || '[]');
-    const existingIndex = bookings.findIndex((b: any) => b.id === booking.id);
-    
-    if (existingIndex >= 0) {
-      bookings[existingIndex] = booking;
-    } else {
-      bookings.push(booking);
-    }
-    
-    localStorage.setItem('skyway_bookings', JSON.stringify(bookings));
   }
 };
 
 export const deleteBooking = async (id: string | number): Promise<void> => {
+  // ALWAYS delete from localStorage first (source of truth for UI)
+  const bookings = JSON.parse(localStorage.getItem('skyway_bookings') || '[]');
+  const filtered = bookings.filter((b: any) => b.id !== id);
+  localStorage.setItem('skyway_bookings', JSON.stringify(filtered));
+  
+  // THEN delete from Supabase if enabled
   if (isSupabaseEnabled()) {
-    // Note: Delete endpoint for bookings should be added to server
-    // For now, we'll update the status
-    const bookings = await getBookings();
-    const booking = bookings.find((b: any) => b.id === id);
-    if (booking) {
-      await saveBooking({ ...booking, status: 'Cancelled' });
+    try {
+      await fetchWithAuth(`/bookings/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      // If DELETE endpoint not available, mark as cancelled instead
+      console.warn('Booking DELETE endpoint not available, marking as cancelled');
+      const booking = bookings.find((b: any) => b.id === id);
+      if (booking) {
+        await saveBooking({ ...booking, status: 'Cancelled' });
+      }
     }
-  } else {
-    const bookings = JSON.parse(localStorage.getItem('skyway_bookings') || '[]');
-    const filtered = bookings.filter((b: any) => b.id !== id);
-    localStorage.setItem('skyway_bookings', JSON.stringify(filtered));
   }
 };
 
 export const setBookings = async (bookings: any[]): Promise<void> => {
+  // ALWAYS update localStorage first (source of truth for UI)
+  localStorage.setItem('skyway_bookings', JSON.stringify(bookings));
+  
+  // THEN sync to Supabase if enabled
   if (isSupabaseEnabled()) {
     for (const booking of bookings) {
       await saveBooking(booking);
     }
-  } else {
-    localStorage.setItem('skyway_bookings', JSON.stringify(bookings));
   }
 };
 
 // ===== PAYMENTS =====
 
 export const getPayments = async (): Promise<any[]> => {
-  if (isSupabaseEnabled()) {
-    const data = await fetchWithAuth('/payments');
-    return data.payments || [];
-  } else {
-    return JSON.parse(localStorage.getItem('skyway_payments') || '[]');
-  }
+  // ALWAYS read from localStorage (source of truth for UI)
+  // Supabase is just a sync backup, not the primary data source
+  return JSON.parse(localStorage.getItem('skyway_payments') || '[]');
 };
 
 export const savePayment = async (payment: any): Promise<void> => {
+  // ALWAYS update localStorage first (source of truth for UI)
+  const payments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
+  const existingIndex = payments.findIndex((p: any) => p.id === payment.id);
+  
+  if (existingIndex >= 0) {
+    payments[existingIndex] = payment;
+  } else {
+    payments.push(payment);
+  }
+  
+  localStorage.setItem('skyway_payments', JSON.stringify(payments));
+  
+  // THEN sync to Supabase if enabled
   if (isSupabaseEnabled()) {
     await fetchWithAuth('/payments', {
       method: 'POST',
       body: JSON.stringify(payment),
     });
-  } else {
-    const payments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
-    const existingIndex = payments.findIndex((p: any) => p.id === payment.id);
-    
-    if (existingIndex >= 0) {
-      payments[existingIndex] = payment;
-    } else {
-      payments.push(payment);
-    }
-    
-    localStorage.setItem('skyway_payments', JSON.stringify(payments));
   }
 };
 
 export const deletePayment = async (id: string | number): Promise<void> => {
+  // ALWAYS delete from localStorage first (source of truth for UI)
+  const payments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
+  const filtered = payments.filter((p: any) => p.id !== id);
+  localStorage.setItem('skyway_payments', JSON.stringify(filtered));
+  
+  // THEN delete from Supabase if enabled
   if (isSupabaseEnabled()) {
     await fetchWithAuth(`/payments/${id}`, {
       method: 'DELETE',
     });
-  } else {
-    const payments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
-    const filtered = payments.filter((p: any) => p.id !== id);
-    localStorage.setItem('skyway_payments', JSON.stringify(filtered));
   }
 };
 
 export const setPayments = async (payments: any[]): Promise<void> => {
+  // ALWAYS update localStorage first (source of truth for UI)
+  localStorage.setItem('skyway_payments', JSON.stringify(payments));
+  
+  // THEN sync to Supabase if enabled
   if (isSupabaseEnabled()) {
     for (const payment of payments) {
       await savePayment(payment);
     }
-  } else {
-    localStorage.setItem('skyway_payments', JSON.stringify(payments));
   }
 };
 
 // ===== CATEGORIES =====
 
 export const getCategories = async (): Promise<string[]> => {
-  if (isSupabaseEnabled()) {
-    const data = await fetchWithAuth('/categories');
-    return data.categories || [];
-  } else {
-    return JSON.parse(localStorage.getItem('skyway_categories') || '[]');
-  }
+  // ALWAYS read from localStorage (source of truth for UI)
+  // Supabase is just a sync backup, not the primary data source
+  return JSON.parse(localStorage.getItem('skyway_categories') || '[]');
 };
 
 export const setCategories = async (categories: string[]): Promise<void> => {
+  // ALWAYS update localStorage first (source of truth for UI)
+  localStorage.setItem('skyway_categories', JSON.stringify(categories));
+  
+  // THEN sync to Supabase if enabled
   if (isSupabaseEnabled()) {
     await fetchWithAuth('/categories', {
       method: 'PUT',
       body: JSON.stringify({ categories }),
     });
-  } else {
-    localStorage.setItem('skyway_categories', JSON.stringify(categories));
   }
 };
 
 // ===== FEATURES =====
 
 export const getFeatures = async (): Promise<string[]> => {
-  if (isSupabaseEnabled()) {
-    const data = await fetchWithAuth('/features');
-    return data.features || [];
-  } else {
-    return JSON.parse(localStorage.getItem('skyway_features') || '[]');
-  }
+  // ALWAYS read from localStorage (source of truth for UI)
+  // Supabase is just a sync backup, not the primary data source
+  return JSON.parse(localStorage.getItem('skyway_features') || '[]');
 };
 
 export const setFeatures = async (features: string[]): Promise<void> => {
+  // ALWAYS update localStorage first (source of truth for UI)
+  localStorage.setItem('skyway_features', JSON.stringify(features));
+  
+  // THEN sync to Supabase if enabled
   if (isSupabaseEnabled()) {
     await fetchWithAuth('/features', {
       method: 'PUT',
       body: JSON.stringify({ features }),
     });
-  } else {
-    localStorage.setItem('skyway_features', JSON.stringify(features));
   }
 };
 
@@ -364,54 +396,67 @@ export const saveSettings = async (settings: any): Promise<void> => {
 // ===== ACTIVITY LOGS =====
 
 export const getActivityLogs = async (): Promise<any[]> => {
-  if (isSupabaseEnabled()) {
-    const data = await fetchWithAuth('/activity-logs');
-    return data.logs || [];
-  } else {
-    return JSON.parse(localStorage.getItem('skyway_activity_logs') || '[]');
-  }
+  // ALWAYS read from localStorage (source of truth for UI)
+  // Supabase is just a sync backup, not the primary data source
+  return JSON.parse(localStorage.getItem('skyway_activity_logs') || '[]');
 };
 
 export const saveActivityLog = async (log: any): Promise<void> => {
+  // ALWAYS update localStorage first (source of truth for UI)
+  const logs = JSON.parse(localStorage.getItem('skyway_activity_logs') || '[]');
+  logs.push(log);
+  localStorage.setItem('skyway_activity_logs', JSON.stringify(logs));
+  
+  // THEN sync to Supabase if enabled
   if (isSupabaseEnabled()) {
     await fetchWithAuth('/activity-logs', {
       method: 'POST',
       body: JSON.stringify(log),
     });
-  } else {
-    const logs = JSON.parse(localStorage.getItem('skyway_activity_logs') || '[]');
-    logs.push(log);
-    localStorage.setItem('skyway_activity_logs', JSON.stringify(logs));
   }
 };
 
 // ===== SYNC FUNCTIONS =====
 
 export const syncToSupabase = async (): Promise<any> => {
-  const properties = JSON.parse(localStorage.getItem('skyway_properties') || '[]');
-  const customers = JSON.parse(localStorage.getItem('skyway_customers') || '[]');
-  const bookings = JSON.parse(localStorage.getItem('skyway_bookings') || '[]');
-  const payments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
-  const categories = JSON.parse(localStorage.getItem('skyway_categories') || '[]');
-  const features = JSON.parse(localStorage.getItem('skyway_features') || '[]');
-  const settings = JSON.parse(localStorage.getItem('skyway_settings') || '{}');
-  const activityLogs = JSON.parse(localStorage.getItem('skyway_activity_logs') || '[]');
-  
-  const result = await fetchWithAuth('/sync/upload', {
-    method: 'POST',
-    body: JSON.stringify({
-      properties,
-      customers,
-      bookings,
-      payments,
-      categories,
-      features,
-      settings,
-      activityLogs,
-    }),
-  });
-  
-  return result;
+  try {
+    const properties = JSON.parse(localStorage.getItem('skyway_properties') || '[]');
+    const customers = JSON.parse(localStorage.getItem('skyway_customers') || '[]');
+    const bookings = JSON.parse(localStorage.getItem('skyway_bookings') || '[]');
+    const payments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
+    const categories = JSON.parse(localStorage.getItem('skyway_categories') || '[]');
+    const features = JSON.parse(localStorage.getItem('skyway_features') || '[]');
+    const settings = JSON.parse(localStorage.getItem('skyway_settings') || '{}');
+    const activityLogs = JSON.parse(localStorage.getItem('skyway_activity_logs') || '[]');
+    
+    // Log data sizes for debugging
+    console.log('Syncing data to Supabase:', {
+      properties: properties.length,
+      customers: customers.length,
+      bookings: bookings.length,
+      payments: payments.length,
+      activityLogs: activityLogs.length
+    });
+    
+    const result = await fetchWithAuth('/sync/upload', {
+      method: 'POST',
+      body: JSON.stringify({
+        properties,
+        customers,
+        bookings,
+        payments,
+        categories,
+        features,
+        settings,
+        activityLogs,
+      }),
+    });
+    
+    return result;
+  } catch (error: any) {
+    console.error('Sync to Supabase failed:', error);
+    throw new Error(`Failed to sync data: ${error.message || 'Unknown error'}`);
+  }
 };
 
 export const syncFromSupabase = async (): Promise<void> => {

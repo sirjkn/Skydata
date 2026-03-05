@@ -170,4 +170,4 @@ If deploying to production and want to remove demo accounts:
 
 ---
 
-**Last Updated**: Version 2.35
+**Last Updated**: Version 3.0

@@ -507,9 +507,31 @@ app.post("/make-server-6a712830/activity-logs", async (c) => {
 
 // ===== SYNC ROUTES =====
 
+// Helper function to chunk arrays for batch processing
+const chunkArray = <T,>(array: T[], chunkSize: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += chunkSize) {
+    chunks.push(array.slice(i, i + chunkSize));
+  }
+  return chunks;
+};
+
 // Sync all data from localStorage to Supabase
 app.post("/make-server-6a712830/sync/upload", async (c) => {
+  let requestData;
+  
   try {
+    // Parse request body with error handling
+    try {
+      requestData = await c.req.json();
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError);
+      return c.json({ 
+        error: 'Failed to parse request body. Data may be too large or malformed.',
+        details: parseError.message 
+      }, 400);
+    }
+    
     const { 
       properties, 
       customers, 
@@ -519,67 +541,127 @@ app.post("/make-server-6a712830/sync/upload", async (c) => {
       features, 
       settings,
       activityLogs 
-    } = await c.req.json();
+    } = requestData;
     
     console.log('Starting data sync to Supabase...');
+    console.log('Data counts:', {
+      properties: properties?.length || 0,
+      customers: customers?.length || 0,
+      bookings: bookings?.length || 0,
+      payments: payments?.length || 0,
+      activityLogs: activityLogs?.length || 0
+    });
     
-    // Sync properties
-    if (properties && Array.isArray(properties)) {
-      for (const property of properties) {
-        await kv.set(`property:${property.id}`, property);
+    // Process all sync operations in parallel with chunking for large datasets
+    const syncPromises = [];
+    const CHUNK_SIZE = 50; // Process 50 items at a time
+    
+    // Sync properties using batch operation with chunking
+    if (properties && Array.isArray(properties) && properties.length > 0) {
+      const propertyChunks = chunkArray(properties, CHUNK_SIZE);
+      console.log(`Processing ${properties.length} properties in ${propertyChunks.length} chunks`);
+      
+      for (const chunk of propertyChunks) {
+        const keys = chunk.map(p => `property:${p.id}`);
+        syncPromises.push(
+          kv.mset(keys, chunk)
+            .then(() => console.log(`✅ Synced ${chunk.length} properties`))
+            .catch(err => console.error('Error syncing properties chunk:', err))
+        );
       }
-      console.log(`✅ Synced ${properties.length} properties`);
     }
     
-    // Sync customers
-    if (customers && Array.isArray(customers)) {
-      for (const customer of customers) {
-        await kv.set(`customer:${customer.id}`, customer);
+    // Sync customers using batch operation with chunking
+    if (customers && Array.isArray(customers) && customers.length > 0) {
+      const customerChunks = chunkArray(customers, CHUNK_SIZE);
+      console.log(`Processing ${customers.length} customers in ${customerChunks.length} chunks`);
+      
+      for (const chunk of customerChunks) {
+        const keys = chunk.map(c => `customer:${c.id}`);
+        syncPromises.push(
+          kv.mset(keys, chunk)
+            .then(() => console.log(`✅ Synced ${chunk.length} customers`))
+            .catch(err => console.error('Error syncing customers chunk:', err))
+        );
       }
-      console.log(`✅ Synced ${customers.length} customers`);
     }
     
-    // Sync bookings
-    if (bookings && Array.isArray(bookings)) {
-      for (const booking of bookings) {
-        await kv.set(`booking:${booking.id}`, booking);
+    // Sync bookings using batch operation with chunking
+    if (bookings && Array.isArray(bookings) && bookings.length > 0) {
+      const bookingChunks = chunkArray(bookings, CHUNK_SIZE);
+      console.log(`Processing ${bookings.length} bookings in ${bookingChunks.length} chunks`);
+      
+      for (const chunk of bookingChunks) {
+        const keys = chunk.map(b => `booking:${b.id}`);
+        syncPromises.push(
+          kv.mset(keys, chunk)
+            .then(() => console.log(`✅ Synced ${chunk.length} bookings`))
+            .catch(err => console.error('Error syncing bookings chunk:', err))
+        );
       }
-      console.log(`✅ Synced ${bookings.length} bookings`);
     }
     
-    // Sync payments
-    if (payments && Array.isArray(payments)) {
-      for (const payment of payments) {
-        await kv.set(`payment:${payment.id}`, payment);
+    // Sync payments using batch operation with chunking
+    if (payments && Array.isArray(payments) && payments.length > 0) {
+      const paymentChunks = chunkArray(payments, CHUNK_SIZE);
+      console.log(`Processing ${payments.length} payments in ${paymentChunks.length} chunks`);
+      
+      for (const chunk of paymentChunks) {
+        const keys = chunk.map(p => `payment:${p.id}`);
+        syncPromises.push(
+          kv.mset(keys, chunk)
+            .then(() => console.log(`✅ Synced ${chunk.length} payments`))
+            .catch(err => console.error('Error syncing payments chunk:', err))
+        );
       }
-      console.log(`✅ Synced ${payments.length} payments`);
+    }
+    
+    // Sync activity logs using batch operation with chunking
+    if (activityLogs && Array.isArray(activityLogs) && activityLogs.length > 0) {
+      const logChunks = chunkArray(activityLogs, CHUNK_SIZE);
+      console.log(`Processing ${activityLogs.length} activity logs in ${logChunks.length} chunks`);
+      
+      for (const chunk of logChunks) {
+        const keys = chunk.map(l => `activity-log:${l.id}`);
+        syncPromises.push(
+          kv.mset(keys, chunk)
+            .then(() => console.log(`✅ Synced ${chunk.length} activity logs`))
+            .catch(err => console.error('Error syncing activity logs chunk:', err))
+        );
+      }
     }
     
     // Sync categories
     if (categories) {
-      await kv.set('app:categories', categories);
-      console.log(`✅ Synced categories`);
+      syncPromises.push(
+        kv.set('app:categories', categories)
+          .then(() => console.log(`✅ Synced categories`))
+          .catch(err => console.error('Error syncing categories:', err))
+      );
     }
     
     // Sync features
     if (features) {
-      await kv.set('app:features', features);
-      console.log(`✅ Synced features`);
+      syncPromises.push(
+        kv.set('app:features', features)
+          .then(() => console.log(`✅ Synced features`))
+          .catch(err => console.error('Error syncing features:', err))
+      );
     }
     
     // Sync settings
     if (settings) {
-      await kv.set('app:settings', settings);
-      console.log(`✅ Synced settings`);
+      syncPromises.push(
+        kv.set('app:settings', settings)
+          .then(() => console.log(`✅ Synced settings`))
+          .catch(err => console.error('Error syncing settings:', err))
+      );
     }
     
-    // Sync activity logs
-    if (activityLogs && Array.isArray(activityLogs)) {
-      for (const log of activityLogs) {
-        await kv.set(`activity-log:${log.id}`, log);
-      }
-      console.log(`✅ Synced ${activityLogs.length} activity logs`);
-    }
+    // Wait for all sync operations to complete
+    await Promise.all(syncPromises);
+    
+    console.log('✅ All data synced successfully to Supabase');
     
     return c.json({ 
       success: true, 
@@ -593,8 +675,8 @@ app.post("/make-server-6a712830/sync/upload", async (c) => {
       }
     });
   } catch (error) {
-    console.log('Error syncing data to Supabase:', error);
-    return c.json({ error: 'Failed to sync data' }, 500);
+    console.error('Error syncing data to Supabase:', error);
+    return c.json({ error: `Failed to sync data: ${error.message}` }, 500);
   }
 });
 

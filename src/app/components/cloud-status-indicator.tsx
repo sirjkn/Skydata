@@ -14,6 +14,7 @@ import { addSyncListener, removeSyncListener } from '../lib/aggressive-sync-mana
 export function CloudStatusIndicator() {
   const [cloudMode, setCloudMode] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
 
   useEffect(() => {
     // Check initial state
@@ -84,17 +85,27 @@ export function CloudStatusIndicator() {
       case 'success':
         return 'Synced!';
       case 'error':
-        return 'Sync Error';
+        return 'Server Offline';
       default:
         return 'Cloud Mode';
+    }
+  };
+
+  const getTooltipText = () => {
+    switch (syncStatus) {
+      case 'error':
+        return 'Cannot connect to Supabase - Server may not be deployed. Data will remain local until connection is restored.';
+      default:
+        return `Using Supabase Cloud Storage - ${getStatusText()}`;
     }
   };
 
   return (
     <div className="fixed bottom-4 right-4 z-50">
       <div
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg backdrop-blur-sm text-white transition-all duration-300 ${getStatusColor()}`}
-        title={`Using Supabase Cloud Storage - ${getStatusText()}`}
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg backdrop-blur-sm text-white transition-all duration-300 ${getStatusColor()} ${syncStatus === 'error' ? 'cursor-help' : ''}`}
+        title={getTooltipText()}
+        onClick={() => syncStatus === 'error' && setShowErrorDetails(!showErrorDetails)}
       >
         {syncStatus === 'syncing' ? (
           <RefreshCw className="w-4 h-4 animate-spin" />
@@ -103,6 +114,34 @@ export function CloudStatusIndicator() {
         )}
         <span className="text-xs font-medium">{getStatusText()}</span>
       </div>
+      
+      {/* Error details popup */}
+      {syncStatus === 'error' && showErrorDetails && (
+        <div className="absolute bottom-full right-0 mb-2 w-80 bg-white rounded-lg shadow-xl border-2 border-red-200 p-4 text-sm">
+          <h4 className="font-bold text-red-900 mb-2">⚠️ Server Connection Failed</h4>
+          <p className="text-gray-700 mb-3">
+            The Supabase server is not responding. Your data is being stored locally and will sync automatically when the connection is restored.
+          </p>
+          <div className="bg-red-50 rounded p-3 mb-3">
+            <p className="text-xs text-red-800 mb-2">
+              <strong>Possible reasons:</strong>
+            </p>
+            <ul className="text-xs text-red-700 space-y-1 list-disc list-inside">
+              <li>Server function not deployed</li>
+              <li>Network connection issue</li>
+              <li>Supabase project offline</li>
+            </ul>
+          </div>
+          <a
+            href="https://supabase.com/dashboard/project/zqnvycenohyyyxnnelbc/functions"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:text-blue-800 underline"
+          >
+            📋 Deploy Server Function →
+          </a>
+        </div>
+      )}
     </div>
   );
 }
