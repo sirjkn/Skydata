@@ -264,7 +264,7 @@ INSERT INTO skyway_settings (setting_category, setting_key, setting_value, setti
 ('user_management', 'session_timeout', '3600', 'number', 'Session timeout in seconds'),
 
 -- SMS Integration Settings
-('sms_integration', 'provider', 'Africa\'s Talking', 'text', 'SMS provider name'),
+('sms_integration', 'provider', 'Africa''s Talking', 'text', 'SMS provider name'),
 ('sms_integration', 'api_key', '', 'text', 'SMS API key'),
 ('sms_integration', 'sender_id', 'SKYWAY', 'text', 'SMS sender ID'),
 ('sms_integration', 'booking_confirmation_enabled', 'true', 'boolean', 'Send SMS on booking confirmation'),
