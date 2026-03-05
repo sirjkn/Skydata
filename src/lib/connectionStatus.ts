@@ -1,15 +1,15 @@
 // Connection Status Manager for Skyway Suites
 // Monitors internet connectivity and Supabase connection
 
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClient as getSingletonClient } from './supabase';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 
 let isOnlineGlobal = navigator.onLine;
 let isSupabaseConnected = false;
 let connectionCheckInterval: NodeJS.Timeout | null = null;
 
-// Create Supabase client
-const supabase = createClient(
+// Get or create Supabase client using singleton pattern
+const getClient = () => getSingletonClient(
   `https://${projectId}.supabase.co`,
   publicAnonKey
 );
@@ -56,6 +56,11 @@ function notifyListeners(status: ConnectionStatus) {
 // Check Supabase connection
 async function checkSupabaseConnection(): Promise<boolean> {
   try {
+    const supabase = getClient();
+    if (!supabase) {
+      return false;
+    }
+    
     // Try to query Supabase - simple health check
     const { error } = await supabase
       .from('skyway_settings')
@@ -122,5 +127,5 @@ export function canPerformOperations(): boolean {
 
 // Get Supabase client
 export function getSupabaseClient() {
-  return supabase;
+  return getClient();
 }

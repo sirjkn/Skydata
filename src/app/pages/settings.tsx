@@ -470,8 +470,12 @@ export function Settings() {
     setShowErrorPopup(false);
 
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(dbSettings.supabaseUrl, dbSettings.supabaseAnonKey);
+      const { getSupabaseClient } = await import('/src/lib/supabase');
+      const supabase = getSupabaseClient(dbSettings.supabaseUrl, dbSettings.supabaseAnonKey);
+      
+      if (!supabase) {
+        throw new Error('Failed to create Supabase client');
+      }
       
       // Test connection by querying settings table
       const { data, error } = await supabase
@@ -498,20 +502,24 @@ export function Settings() {
   const handleSaveDbSettings = async () => {
     try {
       // Save to Supabase settings table so it's accessible across all devices
-      const { createClient } = await import('@supabase/supabase-js');
+      const { getSupabaseClient } = await import('/src/lib/supabase');
       
       if (!dbSettings.supabaseUrl || !dbSettings.supabaseAnonKey) {
         showModal('error', 'Missing Credentials', 'Please provide Supabase URL and Anon Key');
         return;
       }
 
-      const supabase = createClient(dbSettings.supabaseUrl, dbSettings.supabaseAnonKey);
+      const supabase = getSupabaseClient(dbSettings.supabaseUrl, dbSettings.supabaseAnonKey);
+      
+      if (!supabase) {
+        throw new Error('Failed to create Supabase client');
+      }
       
       // Save each setting individually to skyway_settings table
       const settingsToSave = [
-        { category: 'database', key: 'supabase_url', value: dbSettings.supabaseUrl },
-        { category: 'database', key: 'supabase_anon_key', value: dbSettings.supabaseAnonKey },
-        { category: 'database', key: 'supabase_service_key', value: dbSettings.supabaseServiceKey || '' }
+        { setting_category: 'database', setting_key: 'supabase_url', setting_value: dbSettings.supabaseUrl },
+        { setting_category: 'database', setting_key: 'supabase_anon_key', setting_value: dbSettings.supabaseAnonKey },
+        { setting_category: 'database', setting_key: 'supabase_service_key', setting_value: dbSettings.supabaseServiceKey || '' }
       ];
 
       for (const setting of settingsToSave) {
@@ -519,16 +527,17 @@ export function Settings() {
         const { error } = await supabase
           .from('skyway_settings')
           .upsert({
-            category: setting.category,
-            key: setting.key,
-            value: setting.value,
+            setting_category: setting.setting_category,
+            setting_key: setting.setting_key,
+            setting_value: setting.setting_value,
+            setting_type: 'text',
             updated_at: new Date().toISOString()
           }, {
-            onConflict: 'category,key'
+            onConflict: 'setting_category,setting_key'
           });
 
         if (error) {
-          console.error('Error saving setting:', setting.key, error);
+          console.error('Error saving setting:', setting.setting_key, error);
         }
       }
 
@@ -557,26 +566,28 @@ export function Settings() {
 
           // Then try to load from Supabase if we have credentials
           if (localSettings.supabaseUrl && localSettings.supabaseAnonKey) {
-            const { createClient } = await import('@supabase/supabase-js');
-            const supabase = createClient(localSettings.supabaseUrl, localSettings.supabaseAnonKey);
+            const { getSupabaseClient } = await import('/src/lib/supabase');
+            const supabase = getSupabaseClient(localSettings.supabaseUrl, localSettings.supabaseAnonKey);
 
-            const { data, error } = await supabase
-              .from('skyway_settings')
-              .select('*')
-              .eq('category', 'database');
+            if (supabase) {
+              const { data, error } = await supabase
+                .from('skyway_settings')
+                .select('*')
+                .eq('setting_category', 'database');
 
-            if (!error && data && data.length > 0) {
-              // Override with Supabase settings
-              const cloudSettings = {
-                supabaseUrl: data.find(s => s.key === 'supabase_url')?.value || localSettings.supabaseUrl,
-                supabaseAnonKey: data.find(s => s.key === 'supabase_anon_key')?.value || localSettings.supabaseAnonKey,
-                supabaseServiceKey: data.find(s => s.key === 'supabase_service_key')?.value || localSettings.supabaseServiceKey,
-                connectionStatus: localSettings.connectionStatus
-              };
-              setDbSettings(cloudSettings);
-              
-              // Update localStorage with cloud settings
-              localStorage.setItem('skyway_db_settings', JSON.stringify(cloudSettings));
+              if (!error && data && data.length > 0) {
+                // Override with Supabase settings
+                const cloudSettings = {
+                  supabaseUrl: data.find(s => s.setting_key === 'supabase_url')?.setting_value || localSettings.supabaseUrl,
+                  supabaseAnonKey: data.find(s => s.setting_key === 'supabase_anon_key')?.setting_value || localSettings.supabaseAnonKey,
+                  supabaseServiceKey: data.find(s => s.setting_key === 'supabase_service_key')?.setting_value || localSettings.supabaseServiceKey,
+                  connectionStatus: localSettings.connectionStatus
+                };
+                setDbSettings(cloudSettings);
+                
+                // Update localStorage with cloud settings
+                localStorage.setItem('skyway_db_settings', JSON.stringify(cloudSettings));
+              }
             }
           }
         }
