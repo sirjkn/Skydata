@@ -1,18 +1,24 @@
 // Connection Status Manager for Skyway Suites
 // Monitors internet connectivity and Supabase connection
 
-import { getSupabaseClient as getSingletonClient } from './supabase';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
+import { getSupabaseClient, DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from './supabase';
 
 let isOnlineGlobal = navigator.onLine;
 let isSupabaseConnected = false;
 let connectionCheckInterval: NodeJS.Timeout | null = null;
 
-// Get or create Supabase client using singleton pattern
-const getClient = () => getSingletonClient(
-  `https://${projectId}.supabase.co`,
-  publicAnonKey
-);
+// Initialize with default hard-coded credentials
+let supabaseUrl: string | null = DEFAULT_SUPABASE_URL;
+let supabaseKey: string | null = DEFAULT_SUPABASE_ANON_KEY;
+
+/**
+ * Initialize connection monitoring with Supabase credentials
+ * This must be called before starting monitoring
+ */
+export function initializeConnectionMonitoring(url: string, key: string) {
+  supabaseUrl = url;
+  supabaseKey = key;
+}
 
 // Connection status listeners
 const listeners = new Set<(status: ConnectionStatus) => void>();
@@ -56,7 +62,12 @@ function notifyListeners(status: ConnectionStatus) {
 // Check Supabase connection
 async function checkSupabaseConnection(): Promise<boolean> {
   try {
-    const supabase = getClient();
+    // Can't check if credentials aren't set
+    if (!supabaseUrl || !supabaseKey) {
+      return false;
+    }
+    
+    const supabase = getSupabaseClient(supabaseUrl, supabaseKey);
     if (!supabase) {
       return false;
     }
@@ -125,7 +136,10 @@ export function canPerformOperations(): boolean {
   return isOnlineGlobal && isSupabaseConnected;
 }
 
-// Get Supabase client
-export function getSupabaseClient() {
-  return getClient();
+// Get Supabase client (for external use)
+export function getConnectionSupabaseClient() {
+  if (!supabaseUrl || !supabaseKey) {
+    return null;
+  }
+  return getSupabaseClient(supabaseUrl, supabaseKey);
 }

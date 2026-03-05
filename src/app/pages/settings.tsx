@@ -52,6 +52,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Header } from '../components/header';
 import { getCurrentUser } from '../lib/auth';
+import { DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from '/src/lib/supabase';
 
 type SettingsTab = 'general' | 'homepage' | 'users' | 'database' | 'sms';
 
@@ -190,10 +191,10 @@ export function Settings() {
   });
   const [editingUser, setEditingUser] = useState<any>(null);
 
-  // Database Settings States
+  // Database Settings States - Initialize with hard-coded credentials
   const [dbSettings, setDbSettings] = useState({
-    supabaseUrl: '',
-    supabaseAnonKey: '',
+    supabaseUrl: DEFAULT_SUPABASE_URL,
+    supabaseAnonKey: DEFAULT_SUPABASE_ANON_KEY,
     supabaseServiceKey: '',
     connectionStatus: 'disconnected' as 'connected' | 'disconnected' | 'connecting' | 'error'
   });
@@ -485,6 +486,10 @@ export function Settings() {
 
       if (error) throw error;
 
+      // Initialize connection monitoring with these credentials
+      const { initializeConnectionMonitoring } = await import('/src/lib/connectionStatus');
+      initializeConnectionMonitoring(dbSettings.supabaseUrl, dbSettings.supabaseAnonKey);
+
       setDbConnectionStatus('connected');
       showModal('success', 'Connection Successful', 'Successfully connected to Supabase database!');
       logActivity('Database Connected', 'Supabase connection established');
@@ -501,11 +506,11 @@ export function Settings() {
   // Save Database Settings to Supabase
   const handleSaveDbSettings = async () => {
     try {
-      // Save to Supabase settings table so it's accessible across all devices
+      // Save to Supabase settings table (only service key, URL and anon key are hard-coded)
       const { getSupabaseClient } = await import('/src/lib/supabase');
       
       if (!dbSettings.supabaseUrl || !dbSettings.supabaseAnonKey) {
-        showModal('error', 'Missing Credentials', 'Please provide Supabase URL and Anon Key');
+        showModal('error', 'Missing Credentials', 'Database credentials are missing. They should be hard-coded in the app.');
         return;
       }
 
@@ -515,21 +520,14 @@ export function Settings() {
         throw new Error('Failed to create Supabase client');
       }
       
-      // Save each setting individually to skyway_settings table
-      const settingsToSave = [
-        { setting_category: 'database', setting_key: 'supabase_url', setting_value: dbSettings.supabaseUrl },
-        { setting_category: 'database', setting_key: 'supabase_anon_key', setting_value: dbSettings.supabaseAnonKey },
-        { setting_category: 'database', setting_key: 'supabase_service_key', setting_value: dbSettings.supabaseServiceKey || '' }
-      ];
-
-      for (const setting of settingsToSave) {
-        // Upsert settings (insert or update if exists)
+      // Only save service key to Supabase (URL and anon key are hard-coded)
+      if (dbSettings.supabaseServiceKey) {
         const { error } = await supabase
           .from('skyway_settings')
           .upsert({
-            setting_category: setting.setting_category,
-            setting_key: setting.setting_key,
-            setting_value: setting.setting_value,
+            setting_category: 'database',
+            setting_key: 'supabase_service_key',
+            setting_value: dbSettings.supabaseServiceKey,
             setting_type: 'text',
             updated_at: new Date().toISOString()
           }, {
@@ -537,67 +535,69 @@ export function Settings() {
           });
 
         if (error) {
-          console.error('Error saving setting:', setting.setting_key, error);
+          console.error('Error saving service key:', error);
+          throw error;
         }
       }
 
-      // Also save to localStorage as backup for initial load
-      localStorage.setItem('skyway_db_settings', JSON.stringify(dbSettings));
+      // No localStorage usage - credentials are hard-coded
       
-      logActivity('Settings Updated', 'Database settings saved to cloud');
-      showModal('success', 'Settings Saved', 'Database settings saved successfully and synced across all devices!');
+      // Re-initialize connection monitoring (though it's already using the same hard-coded credentials)
+      const { initializeConnectionMonitoring } = await import('/src/lib/connectionStatus');
+      initializeConnectionMonitoring(dbSettings.supabaseUrl, dbSettings.supabaseAnonKey);
+      
+      logActivity('Settings Updated', 'Database service key saved to cloud');
+      showModal('success', 'Settings Saved', 'Database settings saved successfully! Connection is permanent with hard-coded credentials.');
     } catch (error: any) {
       console.error('Error saving settings:', error);
-      // Fallback to localStorage only
-      localStorage.setItem('skyway_db_settings', JSON.stringify(dbSettings));
-      showModal('error', 'Save Error', `Settings saved locally only: ${error.message}`);
+      showModal('error', 'Save Error', `Failed to save settings: ${error.message}`);
     }
   };
 
-  // Load database settings from Supabase or localStorage
+  // Load database settings from Supabase using hard-coded credentials
   useEffect(() => {
     const loadDbSettings = async () => {
       try {
-        // First try localStorage for initial credentials
-        const savedDbSettings = localStorage.getItem('skyway_db_settings');
-        if (savedDbSettings) {
-          const localSettings = JSON.parse(savedDbSettings);
-          setDbSettings(localSettings);
+        // Use hard-coded credentials - no localStorage needed
+        const { getSupabaseClient } = await import('/src/lib/supabase');
+        
+        // The dbSettings state is already initialized with hard-coded credentials
+        // Try to load any additional settings from Supabase (like service key)
+        const supabase = getSupabaseClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY);
 
-          // Then try to load from Supabase if we have credentials
-          if (localSettings.supabaseUrl && localSettings.supabaseAnonKey) {
-            const { getSupabaseClient } = await import('/src/lib/supabase');
-            const supabase = getSupabaseClient(localSettings.supabaseUrl, localSettings.supabaseAnonKey);
+        if (supabase) {
+          const { data, error } = await supabase
+            .from('skyway_settings')
+            .select('*')
+            .eq('setting_category', 'database');
 
-            if (supabase) {
-              const { data, error } = await supabase
-                .from('skyway_settings')
-                .select('*')
-                .eq('setting_category', 'database');
-
-              if (!error && data && data.length > 0) {
-                // Override with Supabase settings
-                const cloudSettings = {
-                  supabaseUrl: data.find(s => s.setting_key === 'supabase_url')?.setting_value || localSettings.supabaseUrl,
-                  supabaseAnonKey: data.find(s => s.setting_key === 'supabase_anon_key')?.setting_value || localSettings.supabaseAnonKey,
-                  supabaseServiceKey: data.find(s => s.setting_key === 'supabase_service_key')?.setting_value || localSettings.supabaseServiceKey,
-                  connectionStatus: localSettings.connectionStatus
-                };
-                setDbSettings(cloudSettings);
-                
-                // Update localStorage with cloud settings
-                localStorage.setItem('skyway_db_settings', JSON.stringify(cloudSettings));
-              }
+          if (!error && data && data.length > 0) {
+            // Only override service key if saved in cloud
+            const serviceKey = data.find(s => s.setting_key === 'supabase_service_key')?.setting_value;
+            if (serviceKey) {
+              setDbSettings(prev => ({
+                ...prev,
+                supabaseServiceKey: serviceKey
+              }));
             }
           }
         }
       } catch (error) {
         console.error('Error loading database settings:', error);
+        // Settings will remain at hard-coded defaults, which is fine
       }
     };
 
     loadDbSettings();
   }, []);
+
+  // Auto-test connection when database tab is opened
+  useEffect(() => {
+    if (activeTab === 'database' && dbConnectionStatus === 'disconnected') {
+      // Automatically test connection with hard-coded credentials
+      handleTestConnection();
+    }
+  }, [activeTab]);
 
   // Backup Database
   const handleBackupDatabase = (format: 'json' | 'sql') => {
@@ -1864,12 +1864,12 @@ export function Settings() {
                         </Button>
                       </div>
                       
-                      {/* Cross-Device Sync Note */}
+                      {/* Permanent Connection Note */}
                       <div className="mt-4 bg-green-50 border-2 border-green-200 rounded-xl p-3">
                         <div className="flex items-start gap-2">
-                          <Globe className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                           <p className="text-xs text-green-800">
-                            <span className="font-semibold">Cloud Sync Enabled:</span> Settings are automatically saved to Supabase and will be accessible from any device accessing this application.
+                            <span className="font-semibold">Permanent Connection:</span> Database credentials are hard-coded. The app automatically connects to Supabase on every launch - even after closing the browser. No reconnection needed!
                           </p>
                         </div>
                       </div>
