@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { 
   Building2, 
   Users, 
@@ -68,7 +68,7 @@ import {
 import * as adminHelpers from '../lib/adminHelpers';
 
 // App version - keep consistent across all modules
-const APP_VERSION = '2.35';
+const APP_VERSION = '3.0';
 
 /**
  * =============================================================================
@@ -2460,8 +2460,7 @@ export function AdminDashboard() {
                           const totalBookingAmount = customerBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
                           
                           // Get all payments for this customer's bookings
-                          const existingPayments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
-                          const customerPayments = existingPayments.filter((p: any) => 
+                          const customerPayments = payments.filter((p: any) => 
                             customerBookings.some(b => b.id === p.bookingId)
                           );
                           const totalPaid = customerPayments.reduce((sum: number, p: any) => sum + (p.paidAmount || 0), 0);
@@ -2561,7 +2560,7 @@ export function AdminDashboard() {
                   </CardHeader>
                   <CardContent>
                     {(() => {
-                      const allPayments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
+                      const allPayments = payments;
                       
                       if (allPayments.length === 0) {
                         return (
@@ -3579,8 +3578,7 @@ export function AdminDashboard() {
                     if (booking) {
                       setSelectedBooking(booking);
                       // Calculate remaining balance
-                      const existingPayments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
-                      const bookingPayments = existingPayments.filter((p: any) => p.bookingId === booking.id);
+                      const bookingPayments = payments.filter((p: any) => p.bookingId === booking.id);
                       const totalPaid = bookingPayments.reduce((sum: number, payment: any) => sum + (payment.paidAmount || 0), 0);
                       const remaining = booking.totalAmount - totalPaid;
                       setPaymentForm({
@@ -3612,8 +3610,7 @@ export function AdminDashboard() {
                   
                   {/* Show payment summary if there are existing payments */}
                   {(() => {
-                    const existingPayments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
-                    const bookingPayments = existingPayments.filter((p: any) => p.bookingId === selectedBooking.id);
+                    const bookingPayments = payments.filter((p: any) => p.bookingId === selectedBooking.id);
                     const totalPaid = bookingPayments.reduce((sum: number, payment: any) => sum + (payment.paidAmount || 0), 0);
                     
                     if (bookingPayments.length > 0) {
@@ -3748,7 +3745,7 @@ export function AdminDashboard() {
             {/* Action Buttons */}
             <div className="flex gap-3 mt-6">
               <Button
-                onClick={() => {
+                onClick={async () => {
                   // Validate form
                   if (!paymentForm.totalAmount) {
                     showModal('error', 'Validation Error', 'Please enter total amount');
@@ -3971,8 +3968,7 @@ export function AdminDashboard() {
 
       {/* View Payments Modal */}
       {showViewPaymentsModal && selectedBooking && (() => {
-        const existingPayments = JSON.parse(localStorage.getItem('skyway_payments') || '[]');
-        const bookingPayments = existingPayments.filter((p: any) => p.bookingId === selectedBooking.id);
+        const bookingPayments = payments.filter((p: any) => p.bookingId === selectedBooking.id);
         
         return (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto">

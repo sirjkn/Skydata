@@ -1,4 +1,5 @@
-import { createBrowserRouter } from "react-router";
+// Skyway Suites - Application Routes Configuration
+import { createBrowserRouter } from "react-router-dom";
 import { RootLayout } from "./components/RootLayout";
 import { Home } from "./pages/home";
 import { PropertyDetails } from "./pages/property-details";

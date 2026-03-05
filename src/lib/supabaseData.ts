@@ -867,6 +867,80 @@ export async function updateSetting(settingId: number, value: string): Promise<S
   return data;
 }
 
+export async function upsertSetting(category: string, key: string, value: string, type: string = 'json'): Promise<Setting> {
+  ensureConnection();
+  const supabase = getClient();
+  
+  const { data, error} = await supabase
+    .from('skyway_settings')
+    .upsert(
+      { 
+        setting_category: category, 
+        setting_key: key, 
+        setting_value: value,
+        setting_type: type 
+      },
+      { onConflict: 'setting_category,setting_key' }
+    )
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error upserting setting:', error);
+    throw error;
+  }
+  
+  return data;
+}
+
+export async function fetchSettingsByCategory(category: string): Promise<Setting[]> {
+  ensureConnection();
+  const supabase = getClient();
+  
+  const { data, error } = await supabase
+    .from('skyway_settings')
+    .select('*')
+    .eq('setting_category', category);
+  
+  if (error) {
+    console.error('Error fetching settings by category:', error);
+    throw error;
+  }
+  
+  return data || [];
+}
+
+export async function deleteSetting(category: string, key: string): Promise<void> {
+  ensureConnection();
+  const supabase = getClient();
+  
+  const { error } = await supabase
+    .from('skyway_settings')
+    .delete()
+    .eq('setting_category', category)
+    .eq('setting_key', key);
+  
+  if (error) {
+    console.error('Error deleting setting:', error);
+    throw error;
+  }
+}
+
+export async function deleteActivityLogs(): Promise<void> {
+  ensureConnection();
+  const supabase = getClient();
+  
+  const { error } = await supabase
+    .from('skyway_activity_logs')
+    .delete()
+    .neq('activity_id', 0); // Delete all records
+  
+  if (error) {
+    console.error('Error deleting activity logs:', error);
+    throw error;
+  }
+}
+
 // ============================================================================
 // AUTH USERS
 // ============================================================================

@@ -1,5 +1,13 @@
 # Skyway Suites - Property Rental Management Platform
 
+## 🚀 Version 3.0 - Cloud Complete Release
+
+> **⚠️ BREAKING CHANGE**: Version 3.0 is a complete rewrite with full Supabase cloud integration. All localStorage dependencies have been removed. Internet connection is now required for all operations.
+
+> **📦 Migration Required**: If upgrading from v2.x, please see the [Migration Guide in CHANGELOG.md](/CHANGELOG.md#migration-guide-v2x-to-v30)
+
+---
+
 ## 📋 Table of Contents
 - [Overview](#overview)
 - [Features](#features)
@@ -22,11 +30,12 @@
 - 🇰🇪 **Kenya-focused**: Prices in Kenyan Shillings (KSh)
 - 📱 **WhatsApp Integration**: Direct customer communication
 - 🎨 **Modern UI**: Responsive design with custom color scheme
-- 💾 **LocalStorage-based**: No backend required - all data stored locally
+- ☁️ **Cloud-Based**: Full Supabase integration for real-time data synchronization
 - 🔐 **Role-Based Access Control**: Admin, Manager, and Customer roles
 - 📊 **Comprehensive Analytics**: Real-time booking and revenue tracking
 - 🖼️ **Image Optimization**: WebP conversion with 50KB compression
 - 📄 **Print-Ready Receipts**: Professional booking and payment receipts
+- 🌐 **Connection Monitoring**: Real-time internet status with offline protection
 
 ---
 
@@ -114,9 +123,12 @@
 - **PostCSS** - CSS processing
 - **ESLint** - Code linting
 
-### Data Management
-- **LocalStorage API** - Client-side data persistence
-- **Custom Storage Utilities** - Type-safe data operations
+### Backend & Data Management
+- **Supabase** - Cloud database and backend services
+- **PostgreSQL** - Relational database
+- **Supabase Edge Functions** - Server-side operations
+- **Real-time Sync** - Cloud data synchronization
+- **Custom Helper Functions** - Type-safe data operations
 
 ---
 
@@ -125,6 +137,7 @@
 ### Prerequisites
 - Node.js 18+ 
 - npm or pnpm
+- Supabase account (for cloud database)
 
 ### Setup Steps
 
@@ -141,21 +154,30 @@ npm install
 pnpm install
 ```
 
-3. **Start development server**
+3. **Configure Supabase**
+   - Create a Supabase project at https://supabase.com
+   - Copy your project URL and keys
+   - Update `/src/lib/supabase.ts` with your credentials:
+```typescript
+export const DEFAULT_SUPABASE_URL = 'your-project-url';
+export const DEFAULT_SUPABASE_ANON_KEY = 'your-anon-key';
+```
+
+4. **Start development server**
 ```bash
 npm run dev
 # or
 pnpm dev
 ```
 
-4. **Build for production**
+5. **Build for production**
 ```bash
 npm run build
 # or
 pnpm build
 ```
 
-5. **Preview production build**
+6. **Preview production build**
 ```bash
 npm run preview
 # or
@@ -276,14 +298,34 @@ pnpm preview
 - Entity tracking (Property, Booking, Customer, Payment, etc.)
 - Search and filter capabilities
 
-### 5. Settings (`/admin/settings`)
+### 5. Activity Log (`/admin/activity-log`)
 **Requires: Admin role**
-- Platform configuration
-- System preferences
-- User management
-- Version information
+- Complete audit trail
+- Action timestamps
+- User attribution
+- Action types (Create, Update, Delete)
+- Entity tracking (Property, Booking, Customer, Payment, etc.)
+- Search and filter capabilities
+- Clear logs functionality
 
-### 6. Menu Pages Manager (`/admin/menu-pages`)
+### 6. Settings (`/admin/settings`)
+**Requires: Admin role**
+
+#### Tabs
+- **General Settings** - Company information and branding
+- **Homepage Settings** - Hero slides, featured sections, footer
+- **User Management** - Add, edit, delete system users
+- **Database Settings** - Backup, restore, and query database
+- **SMS Integration** - Configure SMS providers (Africa's Talking, Twilio)
+
+#### Features
+- Cloud backup & restore
+- Database query copy to clipboard
+- User role management
+- SMS settings configuration
+- Version information display
+
+### 7. Menu Pages Manager (`/admin/menu-pages`)
 **Requires: Admin role**
 - Create custom pages (About Us, Privacy Policy, Terms, Contact)
 - Rich text editor
@@ -291,7 +333,7 @@ pnpm preview
 - URL slug management
 - Navigation menu integration
 
-### 7. Authentication
+### 8. Authentication
 - **Login** (`/login`) - Email/password authentication
 - **Signup** (`/signup`) - Customer registration
 - Demo accounts still functional (not displayed in UI)
@@ -353,36 +395,38 @@ Demo accounts are **still active** in the system for testing purposes but are **
 
 ---
 
-## 💾 Data Storage
+## ☁️ Data Storage - Version 3.0
 
-### LocalStorage Structure
+### Supabase Cloud Database
 
-All data is stored in browser localStorage with the following keys:
+All data is stored in Supabase PostgreSQL database with the following tables:
 
 ```typescript
-// User Authentication
+// Database Tables (all prefixed with _6a712830)
+properties_6a712830       // Property listings
+customers_6a712830        // Customer accounts
+bookings_6a712830         // Booking records
+payments_6a712830         // Payment transactions
+categories_6a712830       // Property categories
+features_6a712830         // Property features/amenities
+activity_logs_6a712830    // System activity logs
+settings_6a712830         // Application settings (key-value)
+kv_store_6a712830         // Flexible key-value storage
+
+// User Authentication (Legacy - localStorage)
 'currentUser': User object
 'users': User[] array
+```
 
-// Property Data
-'properties': Property[] array
-'categories': string[] array
-'features': string[] array
-
-// Booking Data
-'bookings': Booking[] array
-
-// Payment Data
-Stored within booking objects as payments array
-
-// Activity Logs
-'activityLogs': ActivityLog[] array
-
-// Custom Pages
-'menuPages': MenuPage[] array
-
-// Settings
-'settings': Settings object
+### Data Architecture
+```
+Frontend (React)
+    ↓
+Helper Functions (adminHelpers, settingsHelpers)
+    ↓
+Core Supabase Operations (supabaseData.ts)
+    ↓
+Supabase PostgreSQL Database
 ```
 
 ### Data Models
@@ -467,21 +511,36 @@ Stored within booking objects as payments array
 
 ## 📌 Version Information
 
-**Current Version**: `2.35`
+**Current Version**: `3.0.0` - **Cloud Complete** 🚀
 
-All admin modules are standardized with version 2.35:
+### Major Release Highlights
+Version 3.0 represents a complete architectural transformation:
+- ☁️ **100% Supabase Cloud Integration**
+- ❌ **localStorage Completely Removed**
+- 🌐 **Internet Connection Required**
+- 📊 **Real-time Cloud Data Sync**
+- 🔄 **Cloud Backup & Restore**
+- 📈 **Enhanced Activity Logging**
+- 🛡️ **Offline Protection**
+
+All admin modules standardized with version 3.0:
 - Admin Dashboard
 - Settings Module
 - Activity Log
 - Menu Pages Manager
 
 ### Version History
-- **2.35** - Current stable release
-  - Standardized version numbering
-  - Added dashboard sidebar to Activity Log
-  - Removed "Add Booking" button from Bookings section
-  - Added "Book This Property" action in property details modal
+- **3.0.0** (March 5, 2026) - **Cloud Complete Release**
+  - Full Supabase migration (~10,800 lines of code)
+  - Connection status monitoring
+  - Cloud backup/restore functionality
+  - Enhanced settings management
+  - Comprehensive activity logging
+  
+- **2.35** - Previous stable release
+  - localStorage-based storage
   - Enhanced booking workflow
+  - Activity log implementation
 
 ---
 
@@ -566,13 +625,19 @@ WhatsApp contact buttons are integrated throughout the platform:
 
 ---
 
-## 🐛 Known Issues & Debugging
+## 🌐 Connection Requirements - Version 3.0
 
-### Property Availability Bug
-There's a known issue where properties show "Available for booking" even when there are active bookings. Console logging is in place on the property details page to debug the booking detection logic.
+**Important**: Version 3.0 requires an active internet connection to function properly.
 
-**Location**: `/src/app/pages/property-details.tsx`
-**Debug logs**: Check browser console for booking detection output
+- ✅ **Online**: All features available, cloud sync enabled
+- ❌ **Offline**: Connection status banner displayed, all operations disabled
+- 🔄 **Auto-recovery**: Application automatically reconnects when internet is restored
+
+**Connection Status Monitoring**:
+- Displayed in header with real-time monitoring
+- Visual banner when offline (red background)
+- Automatic reconnection detection
+- All database operations require connection
 
 ---
 
@@ -587,11 +652,13 @@ skyway-suites/
 │   │   ├── components/
 │   │   │   ├── custom-modal.tsx       # Custom modal system
 │   │   │   ├── header.tsx             # Site header
+│   │   │   ├── connection-status.tsx  # Connection banner
 │   │   │   ├── rich-text-editor.tsx   # WYSIWYG editor
 │   │   │   └── ui/                    # Shadcn UI components
 │   │   ├── lib/
 │   │   │   ├── auth.ts                # Authentication logic
-│   │   │   └── storage.ts             # LocalStorage utilities
+│   │   │   ├── adminHelpers.ts        # Admin operations wrapper
+│   │   │   └── settingsHelpers.ts     # Settings operations wrapper
 │   │   └── pages/
 │   │       ├── home.tsx               # Landing page
 │   │       ├── property-details.tsx   # Property detail page
@@ -603,6 +670,10 @@ skyway-suites/
 │   │       ├── menu-pages-manager.tsx # Custom pages manager
 │   │       ├── custom-page.tsx        # Custom page renderer
 │   │       └── not-found.tsx          # 404 page
+│   ├── lib/
+│   │   ├── supabase.ts                # Supabase client config
+│   │   ├── supabaseData.ts            # Core Supabase operations
+│   │   └── connectionStatus.ts        # Connection monitoring
 │   └── styles/
 │       ├── index.css                  # Main styles
 │       ├── tailwind.css               # Tailwind imports
@@ -611,6 +682,8 @@ skyway-suites/
 │       └── slider.css                 # Carousel styles
 ├── public/                            # Static assets
 ├── README.md                          # This file
+├── VERSION.md                         # Version history
+├── CHANGELOG.md                       # Detailed changelog
 ├── package.json                       # Dependencies
 └── vite.config.ts                     # Vite configuration
 ```
@@ -639,16 +712,26 @@ Copyright © 2024 Skyway Suites. All rights reserved.
 
 ## 🎯 Future Enhancements
 
-- [ ] Card payment integration
-- [ ] Email notifications
-- [ ] SMS notifications (for Kenya)
-- [ ] Advanced search filters
-- [ ] Property comparison tool
-- [ ] Customer reviews and ratings
-- [ ] Mobile app (React Native)
+### Version 3.1 (Planned)
+- [ ] Real-time updates with Supabase Realtime subscriptions
+- [ ] Push notifications for bookings
+- [ ] Advanced analytics dashboard
+- [ ] Export reports (PDF, Excel)
+
+### Version 3.2 (Planned)
+- [ ] M-Pesa payment gateway integration
+- [ ] Email notification system
+- [ ] SMS notifications implementation (Africa's Talking)
 - [ ] Multi-language support (English/Swahili)
-- [ ] Cloud backup integration
-- [ ] Export data to Excel/PDF
+
+### Version 4.0 (Future)
+- [ ] Multi-tenancy support for multiple property companies
+- [ ] Mobile app (React Native)
+- [ ] Advanced property comparison tool
+- [ ] Customer reviews and ratings
+- [ ] AI-powered recommendations
+- [ ] Card payment integration
+- [ ] Advanced search filters
 
 ---
 

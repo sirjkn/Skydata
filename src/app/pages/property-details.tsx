@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate } from 'react-router-dom';
 import Slider from 'react-slick';
 import { fetchProperties, fetchBookings, fetchCustomers, createBooking } from '../../lib/supabaseData';
 import { ConnectionStatusBanner } from '../components/connection-status';

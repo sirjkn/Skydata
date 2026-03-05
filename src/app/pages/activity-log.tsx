@@ -25,9 +25,11 @@ import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import { getCurrentUser } from '../lib/auth';
 import { CustomModal } from '../components/custom-modal';
+import { fetchActivityLogs, deleteActivityLogs } from '../../lib/supabaseData';
+import { checkConnection } from '../../lib/connectionStatus';
 
 // App version - keep consistent across all modules
-const APP_VERSION = '2.35';
+const APP_VERSION = '3.0';
 
 interface ActivityLog {
   id: string;
@@ -70,12 +72,31 @@ export function ActivityLog() {
     }
   }, [currentUser, navigate]);
 
-  // Load activity logs
+  // Load activity logs from Supabase
   useEffect(() => {
-    const savedLogs = localStorage.getItem('skyway_activity_logs');
-    if (savedLogs) {
-      setActivityLogs(JSON.parse(savedLogs));
-    }
+    const loadActivityLogs = async () => {
+      if (!checkConnection()) {
+        console.warn('No internet connection. Cannot load activity logs.');
+        return;
+      }
+
+      try {
+        const logsData = await fetchActivityLogs(1000); // Fetch up to 1000 logs
+        const formattedLogs = logsData.map((log: any) => ({
+          id: log.activity_id?.toString() || '',
+          user: log.user_name || 'System',
+          action: log.activity || '',
+          details: log.activity_type || '',
+          timestamp: log.created_at || new Date().toISOString()
+        }));
+        setActivityLogs(formattedLogs);
+      } catch (error) {
+        console.error('Error loading activity logs from Supabase:', error);
+        showModal('error', 'Load Error', 'Failed to load activity logs. Please check your connection.');
+      }
+    };
+
+    loadActivityLogs();
   }, []);
 
   const showModal = (
@@ -116,17 +137,27 @@ export function ActivityLog() {
     return matchesSearch && matchesUser && matchesAction;
   });
 
-  // Clear all logs
+  // Clear all logs from Supabase
   const handleClearLogs = () => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot clear logs while offline. Please check your internet connection.');
+      return;
+    }
+
     showModal(
       'confirm',
       'Clear Activity Logs',
-      'Are you sure you want to clear all activity logs? This action cannot be undone.',
-      () => {
-        setActivityLogs([]);
-        localStorage.setItem('skyway_activity_logs', JSON.stringify([]));
-        closeModal();
-        showModal('success', 'Logs Cleared', 'All activity logs have been cleared successfully.');
+      'Are you sure you want to clear all activity logs from the cloud database? This action cannot be undone.',
+      async () => {
+        try {
+          await deleteActivityLogs();
+          setActivityLogs([]);
+          closeModal();
+          showModal('success', 'Logs Cleared', 'All activity logs have been cleared successfully from the cloud.');
+        } catch (error) {
+          console.error('Error clearing activity logs:', error);
+          showModal('error', 'Clear Error', 'Failed to clear activity logs. Please try again.');
+        }
       },
       'Clear All',
       'Cancel'

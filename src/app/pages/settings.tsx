@@ -53,6 +53,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Header } from '../components/header';
 import { getCurrentUser } from '../lib/auth';
 import { DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from '/src/lib/supabase';
+import { checkConnection } from '../../lib/connectionStatus';
+import { ConnectionStatusBanner } from '../components/connection-status';
+import {
+  fetchCustomers,
+  fetchActivityLogs,
+  deleteActivityLogs,
+  createActivityLog
+} from '../../lib/supabaseData';
+import * as settingsHelpers from '../lib/settingsHelpers';
 
 type SettingsTab = 'general' | 'homepage' | 'users' | 'database' | 'sms';
 
@@ -221,66 +230,134 @@ export function Settings() {
   });
   const [messageRecipients, setMessageRecipients] = useState('everyone');
   const [customMessage, setCustomMessage] = useState('');
+  const [isOnline, setIsOnline] = useState(checkConnection());
 
-  // Load settings from localStorage
+  // Load settings from Supabase
   useEffect(() => {
-    const savedGeneralSettings = localStorage.getItem('skyway_general_settings');
-    if (savedGeneralSettings) {
-      setGeneralSettings(JSON.parse(savedGeneralSettings));
-    }
+    const loadAllSettings = async () => {
+      if (!checkConnection()) {
+        console.warn('No internet connection. Settings cannot be loaded.');
+        return;
+      }
 
-    const savedHomePageSettings = localStorage.getItem('skyway_homepage_settings');
-    if (savedHomePageSettings) {
-      setHomePageSettings(JSON.parse(savedHomePageSettings));
-    }
+      try {
+        // Load general settings
+        const generalSettingsData = await settingsHelpers.getGeneralSettings();
+        setGeneralSettings(generalSettingsData);
 
-    const savedUsers = localStorage.getItem('skyway_customers');
-    if (savedUsers) {
-      setUsers(JSON.parse(savedUsers));
-    }
+        // Load homepage settings
+        const homepageSettingsData = await settingsHelpers.getHomePageSettings();
+        setHomePageSettings(homepageSettingsData);
 
-    const savedSmsSettings = localStorage.getItem('skyway_sms_settings');
-    if (savedSmsSettings) {
-      const settings = JSON.parse(savedSmsSettings);
-      setSmsProvider(settings.provider || 'africastalking');
-      setAfricastalkingSettings(settings.africastalking || africastalkingSettings);
-      setTwilioSettings(settings.twilio || twilioSettings);
-      setDefaultMessages(settings.defaultMessages || defaultMessages);
-    }
+        // Load customers (users)
+        const customersData = await fetchCustomers();
+        const formattedUsers = customersData.map((c: any) => ({
+          id: c.customer_id,
+          name: c.customer_name,
+          email: c.email,
+          phone: c.phone,
+          password: c.password || '',
+          role: 'Customer'
+        }));
+        setUsers(formattedUsers);
 
-    // Load activity logs
-    const savedLogs = localStorage.getItem('skyway_activity_logs');
-    if (savedLogs) {
-      setActivityLogs(JSON.parse(savedLogs));
-    }
+        // Load SMS settings
+        const smsSettingsData = await settingsHelpers.getSmsSettings();
+        setSmsProvider(smsSettingsData.provider || 'africastalking');
+        setAfricastalkingSettings(smsSettingsData.africastalking || africastalkingSettings);
+        setTwilioSettings(smsSettingsData.twilio || twilioSettings);
+        setDefaultMessages(smsSettingsData.defaultMessages || defaultMessages);
+
+        // Load activity logs
+        const logsData = await fetchActivityLogs(100);
+        const formattedLogs = logsData.map((log: any) => ({
+          id: log.activity_id,
+          timestamp: log.created_at,
+          user: log.user_name || 'System',
+          action: log.activity,
+          details: log.activity_type
+        }));
+        setActivityLogs(formattedLogs);
+      } catch (error) {
+        console.error('Error loading settings from Supabase:', error);
+      }
+    };
+
+    loadAllSettings();
+
+    // Monitor connection status
+    const intervalId = setInterval(() => {
+      setIsOnline(checkConnection());
+    }, 5000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   // Log Activity
-  const logActivity = (action: string, details: string) => {
-    const newLog = {
-      id: Date.now().toString(),
-      user: currentUser?.name || 'System',
-      action,
-      details,
-      timestamp: new Date().toISOString()
-    };
-    const updatedLogs = [newLog, ...activityLogs].slice(0, 100); // Keep last 100 logs
-    setActivityLogs(updatedLogs);
-    localStorage.setItem('skyway_activity_logs', JSON.stringify(updatedLogs));
+  const logActivity = async (action: string, details: string) => {
+    if (!checkConnection()) {
+      console.warn('Cannot log activity - no internet connection');
+      return;
+    }
+
+    try {
+      await createActivityLog({
+        user_id: currentUser?.id || null,
+        user_name: currentUser?.name || 'System',
+        user_role: currentUser?.role || 'System',
+        activity: action,
+        activity_type: details,
+        entity_type: 'settings',
+        entity_id: null
+      });
+
+      // Reload activity logs
+      const logsData = await fetchActivityLogs(100);
+      const formattedLogs = logsData.map((log: any) => ({
+        id: log.activity_id,
+        timestamp: log.created_at,
+        user: log.user_name || 'System',
+        action: log.activity,
+        details: log.activity_type
+      }));
+      setActivityLogs(formattedLogs);
+    } catch (error) {
+      console.error('Error logging activity:', error);
+    }
   };
 
   // Save General Settings
-  const handleSaveGeneralSettings = () => {
-    localStorage.setItem('skyway_general_settings', JSON.stringify(generalSettings));
-    logActivity('Settings Updated', 'General settings saved');
-    showModal('success', 'Settings Saved', 'General settings saved successfully!');
+  const handleSaveGeneralSettings = async () => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot save settings while offline. Please check your internet connection.');
+      return;
+    }
+
+    try {
+      await settingsHelpers.saveGeneralSettings(generalSettings);
+      await logActivity('Settings Updated', 'General settings saved');
+      showModal('success', 'Settings Saved', 'General settings saved successfully!');
+    } catch (error) {
+      console.error('Error saving general settings:', error);
+      showModal('error', 'Error', 'Failed to save general settings. Please try again.');
+    }
   };
 
   // Save Home Page Settings
-  const handleSaveHomePageSettings = () => {
-    localStorage.setItem('skyway_homepage_settings', JSON.stringify(homePageSettings));
-    logActivity('Settings Updated', 'Home page settings saved');
-    showModal('success', 'Settings Saved', 'Home page settings saved successfully!');
+  const handleSaveHomePageSettings = async () => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot save settings while offline. Please check your internet connection.');
+      return;
+    }
+
+    try {
+      await settingsHelpers.saveHomePageSettings(homePageSettings);
+      await logActivity('Settings Updated', 'Home page settings saved');
+      showModal('success', 'Settings Saved', 'Home page settings saved successfully!');
+    } catch (error) {
+      console.error('Error saving homepage settings:', error);
+      showModal('error', 'Error', 'Failed to save homepage settings. Please try again.');
+    }
   };
 
   // Handle Logo Upload
@@ -365,26 +442,57 @@ export function Settings() {
     setShowWhyUsModal(false);
   };
 
-  // Add User
-  const handleAddUser = (e: React.FormEvent) => {
+  // Add User to Supabase
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = {
-      id: Date.now().toString(),
-      ...newUser,
-      createdAt: new Date().toISOString()
-    };
-    const updatedUsers = [...users, user];
-    localStorage.setItem('skyway_customers', JSON.stringify(updatedUsers));
-    setUsers(updatedUsers);
-    setShowAddUserModal(false);
-    setNewUser({
-      name: '',
-      email: '',
-      phone: '',
-      password: '',
-      role: 'Customer'
-    });
-    showModal('success', 'User Added', 'User added successfully!');
+    
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot add user while offline. Please check your internet connection.');
+      return;
+    }
+
+    try {
+      const { createCustomer } = await import('../../lib/supabaseData');
+      
+      const newCustomerData = {
+        customer_name: newUser.name,
+        phone: newUser.phone,
+        email: newUser.email,
+        password: newUser.password || '',
+        address: '',
+        id_number: '',
+        profile_photo: null,
+        notes: null,
+        is_active: true
+      };
+
+      const createdCustomer = await createCustomer(newCustomerData);
+      
+      const formattedUser = {
+        id: createdCustomer.customer_id?.toString() || '',
+        name: createdCustomer.customer_name,
+        email: createdCustomer.email,
+        phone: createdCustomer.phone,
+        password: createdCustomer.password || '',
+        role: 'Customer'
+      };
+
+      setUsers([...users, formattedUser]);
+      setShowAddUserModal(false);
+      setNewUser({
+        name: '',
+        email: '',
+        phone: '',
+        password: '',
+        role: 'Customer'
+      });
+      
+      await logActivity('User Added', `Added new user: ${newUser.name}`);
+      showModal('success', 'User Added', 'User added successfully to the cloud!');
+    } catch (error) {
+      console.error('Error adding user:', error);
+      showModal('error', 'Error', 'Failed to add user. Please try again.');
+    }
   };
 
   // Edit User
@@ -400,56 +508,100 @@ export function Settings() {
     setShowAddUserModal(true);
   };
 
-  // Update User
-  const handleUpdateUser = (e: React.FormEvent) => {
+  // Update User in Supabase
+  const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const updatedUsers = users.map(u =>
-      u.id === editingUser.id
-        ? {
-            ...u,
-            name: newUser.name,
-            email: newUser.email,
-            phone: newUser.phone,
-            role: newUser.role,
-            ...(newUser.password ? { password: newUser.password } : {})
-          }
-        : u
-    );
-    localStorage.setItem('skyway_customers', JSON.stringify(updatedUsers));
-    setUsers(updatedUsers);
-    setShowAddUserModal(false);
-    setEditingUser(null);
-    setNewUser({
-      name: '',
-      email: '',
-      phone: '',
-      password: '',
-      role: 'Customer'
-    });
-    showModal('success', 'User Updated', 'User updated successfully!');
+    
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot update user while offline. Please check your internet connection.');
+      return;
+    }
+
+    try {
+      const { updateCustomer } = await import('../../lib/supabaseData');
+      
+      const updates: any = {
+        customer_name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone
+      };
+
+      if (newUser.password) {
+        updates.password = newUser.password;
+      }
+
+      await updateCustomer(parseInt(editingUser.id), updates);
+      
+      const updatedUsers = users.map(u =>
+        u.id === editingUser.id
+          ? {
+              ...u,
+              name: newUser.name,
+              email: newUser.email,
+              phone: newUser.phone,
+              role: newUser.role,
+              ...(newUser.password ? { password: newUser.password } : {})
+            }
+          : u
+      );
+      
+      setUsers(updatedUsers);
+      setShowAddUserModal(false);
+      setEditingUser(null);
+      setNewUser({
+        name: '',
+        email: '',
+        phone: '',
+        password: '',
+        role: 'Customer'
+      });
+      
+      await logActivity('User Updated', `Updated user: ${newUser.name}`);
+      showModal('success', 'User Updated', 'User updated successfully in the cloud!');
+    } catch (error) {
+      console.error('Error updating user:', error);
+      showModal('error', 'Error', 'Failed to update user. Please try again.');
+    }
   };
 
-  // Update User Role
-  const handleUpdateUserRole = (userId: string, newRole: string) => {
+  // Update User Role (Note: Role is not stored in Supabase customer table, only locally tracked)
+  const handleUpdateUserRole = async (userId: string, newRole: string) => {
+    // Since role is not part of the customer table in Supabase, we just update locally
+    // In a real implementation, you'd have a separate users/roles table
     const updatedUsers = users.map(u => 
       u.id === userId ? { ...u, role: newRole } : u
     );
-    localStorage.setItem('skyway_customers', JSON.stringify(updatedUsers));
     setUsers(updatedUsers);
+    
+    await logActivity('User Role Updated', `Updated role for user ID: ${userId} to ${newRole}`);
   };
 
-  // Delete User
+  // Delete User from Supabase
   const handleDeleteUser = (userId: string) => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot delete user while offline. Please check your internet connection.');
+      return;
+    }
+
     const user = users.find(u => u.id === userId);
     showModal(
       'confirm',
       'Delete User',
-      `Are you sure you want to delete ${user?.name || 'this user'}? This action cannot be undone.`,
-      () => {
-        const updatedUsers = users.filter(u => u.id !== userId);
-        localStorage.setItem('skyway_customers', JSON.stringify(updatedUsers));
-        setUsers(updatedUsers);
-        showModal('success', 'User Deleted', 'User has been deleted successfully!');
+      `Are you sure you want to delete ${user?.name || 'this user'} from the cloud database? This action cannot be undone.`,
+      async () => {
+        try {
+          const { deleteCustomer } = await import('../../lib/supabaseData');
+          await deleteCustomer(parseInt(userId));
+          
+          const updatedUsers = users.filter(u => u.id !== userId);
+          setUsers(updatedUsers);
+          
+          await logActivity('User Deleted', `Deleted user: ${user?.name || userId}`);
+          showModal('success', 'User Deleted', 'User has been deleted successfully from the cloud!');
+        } catch (error) {
+          console.error('Error deleting user:', error);
+          showModal('error', 'Error', 'Failed to delete user. Please try again.');
+        }
       },
       'Delete',
       'Cancel'
@@ -600,13 +752,37 @@ export function Settings() {
   }, [activeTab]);
 
   // Backup Database
-  const handleBackupDatabase = (format: 'json' | 'sql') => {
+  const handleBackupDatabase = async (format: 'json' | 'sql') => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot backup database while offline. Please check your internet connection.');
+      return;
+    }
+
+    try {
+      const {
+        fetchProperties,
+        fetchBookings,
+        fetchCustomers,
+        fetchCategories,
+        fetchFeatures
+      } = await import('../../lib/supabaseData');
+
+      showModal('info', 'Backing Up', 'Fetching data from cloud database...');
+
+      const [properties, bookings, customers, categories, features] = await Promise.all([
+        fetchProperties(),
+        fetchBookings(),
+        fetchCustomers(),
+        fetchCategories(),
+        fetchFeatures()
+      ]);
+
     const data = {
-      properties: JSON.parse(localStorage.getItem('skyway_properties') || '[]'),
-      bookings: JSON.parse(localStorage.getItem('skyway_bookings') || '[]'),
-      customers: JSON.parse(localStorage.getItem('skyway_customers') || '[]'),
-      categories: JSON.parse(localStorage.getItem('skyway_categories') || '[]'),
-      features: JSON.parse(localStorage.getItem('skyway_features') || '[]'),
+      properties,
+      bookings,
+      customers,
+      categories,
+      features,
       settings: {
         general: generalSettings,
         homepage: homePageSettings,
@@ -617,7 +793,8 @@ export function Settings() {
           defaultMessages: defaultMessages
         }
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      source: 'Supabase Cloud Database'
     };
 
     let content: string;
@@ -626,27 +803,19 @@ export function Settings() {
 
     if (format === 'json') {
       content = JSON.stringify(data, null, 2);
-      filename = `skyway-backup-${Date.now()}.json`;
+      filename = `skyway-cloud-backup-${Date.now()}.json`;
       type = 'application/json';
     } else {
       const sqlStatements = [];
-      sqlStatements.push('-- Skyway Suites Database Backup');
+      sqlStatements.push('-- Skyway Suites Cloud Database Backup');
       sqlStatements.push(`-- Generated: ${new Date().toISOString()}`);
+      sqlStatements.push(`-- Total Records: ${properties.length} properties, ${bookings.length} bookings, ${customers.length} customers`);
       sqlStatements.push('');
       
-      sqlStatements.push('-- PROPERTIES');
-      data.properties.forEach((prop: any) => {
-        sqlStatements.push(`INSERT INTO properties VALUES ('${prop.id}', '${prop.name}', '${prop.location}', ${prop.price}, '${prop.category}', '${prop.createdAt}');`);
-      });
-      
-      sqlStatements.push('');
-      sqlStatements.push('-- BOOKINGS');
-      data.bookings.forEach((booking: any) => {
-        sqlStatements.push(`INSERT INTO bookings VALUES ('${booking.id}', '${booking.propertyId}', '${booking.customerName}', '${booking.checkIn}', '${booking.checkOut}', ${booking.totalAmount}, '${booking.status}');`);
-      });
+      sqlStatements.push('-- Note: This is a simplified SQL export. Import via JSON format for full restore.');
       
       content = sqlStatements.join('\n');
-      filename = `skyway-backup-${Date.now()}.sql`;
+      filename = `skyway-cloud-backup-${Date.now()}.sql`;
       type = 'text/plain';
     }
 
@@ -657,81 +826,280 @@ export function Settings() {
     link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
+    
+    closeModal();
+    await logActivity('Database Backup', `Created ${format.toUpperCase()} backup from cloud`);
+    showModal('success', 'Backup Complete', `Database backed up successfully! Downloaded as ${filename}`);
+    } catch (error) {
+      console.error('Error backing up database:', error);
+      showModal('error', 'Backup Error', 'Failed to backup database. Please try again.');
+    }
   };
 
-  // Restore Database
+  // Restore Database to Supabase
   const handleRestoreDatabase = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot restore database while offline. Please check your internet connection.');
+      return;
+    }
+
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
         
         showModal(
           'confirm',
           'Restore Database',
-          'This will overwrite all current data including properties, bookings, customers, and settings. Are you sure you want to continue?',
-          () => {
-            localStorage.setItem('skyway_properties', JSON.stringify(data.properties || []));
-            localStorage.setItem('skyway_bookings', JSON.stringify(data.bookings || []));
-            localStorage.setItem('skyway_customers', JSON.stringify(data.customers || []));
-            localStorage.setItem('skyway_categories', JSON.stringify(data.categories || []));
-            localStorage.setItem('skyway_features', JSON.stringify(data.features || []));
-            
-            if (data.settings) {
-              if (data.settings.general) {
-                localStorage.setItem('skyway_general_settings', JSON.stringify(data.settings.general));
-                setGeneralSettings(data.settings.general);
+          'This will overwrite all current data including properties, bookings, customers, categories, features, and settings in the cloud. Are you sure you want to continue?',
+          async () => {
+            try {
+              showModal('info', 'Restoring Database', 'Uploading data to cloud database... This may take a moment.');
+
+              // Import Supabase functions
+              const {
+                createProperty,
+                createBooking,
+                createCustomer,
+                createCategory,
+                createFeature,
+                deleteProperty,
+                deleteBooking,
+                deleteCustomer,
+                deleteCategory,
+                deleteFeature,
+                fetchProperties,
+                fetchBookings,
+                fetchCustomers,
+                fetchCategories,
+                fetchFeatures
+              } = await import('../../lib/supabaseData');
+
+              // Step 1: Delete all existing data
+              const [existingProperties, existingBookings, existingCustomers, existingCategories, existingFeatures] = await Promise.all([
+                fetchProperties(),
+                fetchBookings(),
+                fetchCustomers(),
+                fetchCategories(),
+                fetchFeatures()
+              ]);
+
+              // Delete in reverse dependency order
+              await Promise.all(existingBookings.map(b => deleteBooking(b.booking_id!)));
+              await Promise.all(existingProperties.map(p => deleteProperty(p.property_id!)));
+              await Promise.all(existingCustomers.map(c => deleteCustomer(c.customer_id!)));
+              await Promise.all(existingFeatures.map(f => deleteFeature(f.feature_id!)));
+              await Promise.all(existingCategories.map(c => deleteCategory(c.category_id!)));
+
+              // Step 2: Restore Categories first (needed for properties)
+              if (data.categories && data.categories.length > 0) {
+                for (const category of data.categories) {
+                  await createCategory({
+                    category_name: category.category_name,
+                    description: category.description,
+                    icon: category.icon
+                  });
+                }
               }
-              if (data.settings.homepage) {
-                localStorage.setItem('skyway_homepage_settings', JSON.stringify(data.settings.homepage));
-                setHomePageSettings(data.settings.homepage);
+
+              // Step 3: Restore Features
+              if (data.features && data.features.length > 0) {
+                for (const feature of data.features) {
+                  await createFeature({
+                    feature_name: feature.feature_name,
+                    description: feature.description,
+                    icon: feature.icon
+                  });
+                }
               }
-              if (data.settings.sms) {
-                localStorage.setItem('skyway_sms_settings', JSON.stringify(data.settings.sms));
+
+              // Step 4: Restore Customers (needed for bookings)
+              if (data.customers && data.customers.length > 0) {
+                for (const customer of data.customers) {
+                  await createCustomer({
+                    customer_name: customer.customer_name,
+                    phone: customer.phone,
+                    email: customer.email,
+                    address: customer.address,
+                    password: customer.password,
+                    id_number: customer.id_number,
+                    profile_photo: customer.profile_photo,
+                    notes: customer.notes,
+                    is_active: customer.is_active !== false
+                  });
+                }
               }
+
+              // Step 5: Restore Properties (needed for bookings)
+              if (data.properties && data.properties.length > 0) {
+                for (const property of data.properties) {
+                  await createProperty({
+                    property_name: property.property_name,
+                    category_id: property.category_id,
+                    location: property.location,
+                    no_of_beds: property.no_of_beds,
+                    bathrooms: property.bathrooms,
+                    area_sqft: property.area_sqft,
+                    description: property.description,
+                    price_per_month: property.price_per_month,
+                    security_deposit: property.security_deposit,
+                    photos: typeof property.photos === 'string' ? property.photos : JSON.stringify(property.photos),
+                    features: typeof property.features === 'string' ? property.features : JSON.stringify(property.features),
+                    is_available: property.is_available !== false,
+                    is_featured: property.is_featured || false
+                  });
+                }
+              }
+
+              // Step 6: Restore Bookings
+              if (data.bookings && data.bookings.length > 0) {
+                for (const booking of data.bookings) {
+                  await createBooking({
+                    customer_id: booking.customer_id,
+                    property_id: booking.property_id,
+                    check_in_date: booking.check_in_date,
+                    check_out_date: booking.check_out_date,
+                    total_amount: booking.total_amount,
+                    amount_paid: booking.amount_paid,
+                    payment_status: booking.payment_status,
+                    booking_status: booking.booking_status,
+                    payment_method: booking.payment_method,
+                    payment_reference: booking.payment_reference,
+                    notes: booking.notes,
+                    created_by: booking.created_by
+                  });
+                }
+              }
+
+              // Step 7: Restore Settings
+              if (data.settings) {
+                if (data.settings.general) {
+                  await settingsHelpers.saveGeneralSettings(data.settings.general);
+                  setGeneralSettings(data.settings.general);
+                }
+                if (data.settings.homepage) {
+                  await settingsHelpers.saveHomePageSettings(data.settings.homepage);
+                  setHomePageSettings(data.settings.homepage);
+                }
+                if (data.settings.sms) {
+                  await settingsHelpers.saveSmsSettings(data.settings.sms);
+                  if (data.settings.sms.provider) {
+                    setSmsProvider(data.settings.sms.provider);
+                  }
+                  if (data.settings.sms.africastalking) {
+                    setAfricastalkingSettings(data.settings.sms.africastalking);
+                  }
+                  if (data.settings.sms.twilio) {
+                    setTwilioSettings(data.settings.sms.twilio);
+                  }
+                  if (data.settings.sms.defaultMessages) {
+                    setDefaultMessages(data.settings.sms.defaultMessages);
+                  }
+                }
+              }
+
+              await logActivity('Database Restored', 'Full database restore from backup file to cloud');
+              
+              showModal('success', 'Restore Complete', 'Database restored successfully to cloud! The page will refresh.', () => {
+                window.location.reload();
+              });
+            } catch (error) {
+              console.error('Error restoring database to cloud:', error);
+              showModal('error', 'Restore Failed', `Failed to restore database: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
-            
-            showModal('success', 'Restore Complete', 'Database restored successfully! The page will refresh.', () => {
-              window.location.reload();
-            });
           },
           'Restore',
           'Cancel'
         );
       } catch (error) {
-        showModal('error', 'Restore Failed', 'Error restoring database. Please check the file format.');
-        console.error(error);
+        showModal('error', 'Restore Failed', 'Error reading backup file. Please check the file format.');
+        console.error('Error parsing backup file:', error);
       }
     };
     reader.readAsText(file);
   };
 
-  // Copy Database Query
-  const handleCopyDatabaseQuery = () => {
-    const data = {
-      properties: JSON.parse(localStorage.getItem('skyway_properties') || '[]'),
-      bookings: JSON.parse(localStorage.getItem('skyway_bookings') || '[]'),
-      customers: JSON.parse(localStorage.getItem('skyway_customers') || '[]')
-    };
-    
-    navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-    showModal('success', 'Copied', 'Database query copied to clipboard!');
+  // Copy Database Query from Supabase
+  const handleCopyDatabaseQuery = async () => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot copy database while offline. Please check your internet connection.');
+      return;
+    }
+
+    try {
+      showModal('info', 'Copying', 'Fetching data from cloud database...');
+
+      const {
+        fetchProperties,
+        fetchBookings,
+        fetchCustomers,
+        fetchCategories,
+        fetchFeatures
+      } = await import('../../lib/supabaseData');
+
+      const [properties, bookings, customers, categories, features] = await Promise.all([
+        fetchProperties(),
+        fetchBookings(),
+        fetchCustomers(),
+        fetchCategories(),
+        fetchFeatures()
+      ]);
+
+      const data = {
+        properties,
+        bookings,
+        customers,
+        categories,
+        features,
+        settings: {
+          general: generalSettings,
+          homepage: homePageSettings,
+          sms: {
+            provider: smsProvider,
+            africastalking: africastalkingSettings,
+            twilio: twilioSettings,
+            defaultMessages: defaultMessages
+          }
+        },
+        timestamp: new Date().toISOString(),
+        source: 'Supabase Cloud Database'
+      };
+      
+      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      closeModal();
+      await logActivity('Database Query Copied', 'Cloud database data copied to clipboard');
+      showModal('success', 'Copied', 'Cloud database query copied to clipboard!');
+    } catch (error) {
+      console.error('Error copying database query from cloud:', error);
+      showModal('error', 'Copy Failed', 'Failed to copy database query. Please try again.');
+    }
   };
 
-  // Save SMS Settings
-  const handleSaveSmsSettings = () => {
-    const smsSettings = {
-      provider: smsProvider,
-      africastalking: africastalkingSettings,
-      twilio: twilioSettings,
-      defaultMessages: defaultMessages
-    };
-    localStorage.setItem('skyway_sms_settings', JSON.stringify(smsSettings));
-    logActivity('Settings Updated', 'SMS settings saved');
-    showModal('success', 'Settings Saved', 'SMS settings saved successfully!');
+  // Save SMS Settings to Supabase
+  const handleSaveSmsSettings = async () => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot save SMS settings while offline. Please check your internet connection.');
+      return;
+    }
+
+    try {
+      const smsSettings = {
+        provider: smsProvider,
+        africastalking: africastalkingSettings,
+        twilio: twilioSettings,
+        defaultMessages: defaultMessages
+      };
+      
+      await settingsHelpers.saveSmsSettings(smsSettings);
+      await logActivity('Settings Updated', 'SMS settings saved to cloud');
+      showModal('success', 'Settings Saved', 'SMS settings saved successfully to the cloud!');
+    } catch (error) {
+      console.error('Error saving SMS settings:', error);
+      showModal('error', 'Error', 'Failed to save SMS settings. Please try again.');
+    }
   };
 
   // Send Custom Message
