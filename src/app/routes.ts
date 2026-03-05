@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router";
+import { RootLayout } from "./components/RootLayout";
 import { Home } from "./pages/home";
 import { PropertyDetails } from "./pages/property-details";
 import { Login } from "./pages/login";
@@ -13,42 +14,52 @@ import { NotFound } from "./pages/not-found";
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: Home,
-  },
-  {
-    path: "/property/:id",
-    Component: PropertyDetails,
-  },
-  {
-    path: "/login",
-    Component: Login,
-  },
-  {
-    path: "/signup",
-    Component: Signup,
-  },
-  {
-    path: "/admin/dashboard",
-    Component: AdminDashboard,
-  },
-  {
-    path: "/admin/settings",
-    Component: Settings,
-  },
-  {
-    path: "/admin/menu-pages",
-    Component: MenuPagesManager,
-  },
-  {
-    path: "/admin/activity-log",
-    Component: ActivityLog,
-  },
-  {
-    path: "/page/:slug",
-    Component: CustomPage,
-  },
-  {
-    path: "*",
-    Component: NotFound,
+    Component: RootLayout,
+    children: [
+      {
+        index: true,
+        Component: Home,
+      },
+      {
+        path: "property/:id",
+        Component: PropertyDetails,
+      },
+      {
+        path: "login",
+        Component: Login,
+      },
+      {
+        path: "signup",
+        Component: Signup,
+      },
+      {
+        path: "admin/dashboard",
+        Component: AdminDashboard,
+      },
+      {
+        path: "admin/settings",
+        Component: Settings,
+      },
+      {
+        path: "settings",
+        Component: Settings,
+      },
+      {
+        path: "admin/menu-pages",
+        Component: MenuPagesManager,
+      },
+      {
+        path: "admin/activity-log",
+        Component: ActivityLog,
+      },
+      {
+        path: "page/:slug",
+        Component: CustomPage,
+      },
+      {
+        path: "*",
+        Component: NotFound,
+      },
+    ],
   },
 ]);

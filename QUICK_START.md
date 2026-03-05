@@ -1,351 +1,153 @@
-# Skyway Suites - Quick Start Guide
+# Skyway Suites 3.0 - Quick Start Guide
 
-## 🚀 Get Started in 5 Minutes
+## 🚀 5-Minute Setup
 
-This guide will help you set up and run Skyway Suites locally.
-
----
-
-## 📋 Prerequisites
-
-Before you begin, make sure you have:
-
-- ✅ **Node.js** 18+ installed ([Download](https://nodejs.org/))
-- ✅ **npm** or **pnpm** package manager
-- ✅ A modern web browser (Chrome, Firefox, Safari, Edge)
-- ✅ Code editor (VS Code recommended)
-
----
-
-## ⚡ Installation
-
-### Step 1: Install Dependencies
-
-```bash
-# Using npm
-npm install
-
-# OR using pnpm
-pnpm install
+### 1. Create Supabase Project (2 minutes)
+```
+1. Go to https://supabase.com → Sign In/Sign Up
+2. Click "New Project"
+3. Fill in:
+   - Name: Skyway Suites
+   - Database Password: [your-secure-password]
+   - Region: Mumbai (closest to Kenya)
+4. Click "Create new project"
+5. Wait 2-3 minutes for deployment
 ```
 
-### Step 2: Start Development Server
-
-```bash
-# Using npm
-npm run dev
-
-# OR using pnpm
-pnpm dev
+### 2. Run Database Schema (1 minute)
+```
+1. In Supabase → Click "SQL Editor" (left sidebar)
+2. Click "New query"
+3. Open /database/skyway_suites_schema.sql
+4. Copy ALL contents (Ctrl+A, Ctrl+C)
+5. Paste into SQL Editor (Ctrl+V)
+6. Click "Run" (or F5)
+7. ✅ See success message
 ```
 
-The app will start at: **http://localhost:5173**
-
----
-
-## 🔐 First Login
-
-### Option 1: Admin Access
-
+### 3. Get API Credentials (30 seconds)
 ```
-Email:    admin@skyway.com
-Password: admin123
-```
-
-**What you can do:**
-- Access full admin dashboard
-- Create and manage properties
-- Process bookings and payments
-- View activity logs
-
-### Option 2: Customer Access
-
-```
-Email:    user@skyway.com
-Password: user123
+1. In Supabase → Settings → API
+2. Copy these 3 values:
+   
+   📋 Project URL:
+   https://xxxxxxxxxxxxx.supabase.co
+   
+   📋 anon/public key:
+   eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   
+   📋 service_role key: (optional for now)
+   eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-**What you can do:**
-- Browse properties
-- Make bookings
-- View property details
-
----
-
-## 🎯 Quick Feature Tour
-
-### 1. Browse Properties (No Login Required)
-1. Open **http://localhost:5173**
-2. Scroll down to see property listings
-3. Click any property to view details
-
-### 2. Create Your First Property (Admin)
-1. Login with admin credentials
-2. Navigate to **Dashboard** (top-right menu)
-3. Click **Properties** in the sidebar
-4. Click **"Add Property"** button
-5. Fill in property details:
-   - Name: "Modern 2BR Apartment"
-   - Category: Select from dropdown or create new
-   - Location: "Nairobi, Kenya"
-   - Price: 5000 (KSh per day)
-   - Beds: 2
-   - Baths: 1
-   - Area: 850 sqft
-   - Description: Add details
-6. Upload images (automatically optimized)
-7. Add features (WiFi, Parking, etc.)
-8. Click **"Add Property"**
-
-### 3. Make a Booking (Admin)
-1. Go to **Properties** section in admin dashboard
-2. Find a property
-3. Click the **eye icon** to view details
-4. Click **"Book This Property"** button
-5. Select or create a customer
-6. Choose check-in and check-out dates
-7. Click **"Add Booking"**
-
-### 4. Process a Payment (Admin)
-1. Navigate to **Payments** in sidebar
-2. Find the booking
-3. Click **"Add Payment"**
-4. Enter payment details:
-   - Amount: Enter amount paid
-   - Method: Select payment method
-   - Transaction ID: Optional reference
-5. Click **"Add Payment"**
-6. Booking auto-confirms when fully paid
-
----
-
-## 📁 Project Structure
-
+### 4. Configure Skyway Suites (1 minute)
 ```
-skyway-suites/
-├── src/
-│   ├── app/
-│   │   ├── App.tsx              ← Main app entry
-│   │   ├── routes.ts            ← All routes defined here
-│   │   ├── pages/               ← Page components
-│   │   │   ├── home.tsx
-│   │   │   ├── admin-dashboard.tsx
-│   │   │   ├── property-details.tsx
-│   │   │   └── ...
-│   │   ├── components/          ← Reusable components
-│   │   │   ├── header.tsx
-│   │   │   ├── custom-modal.tsx
-│   │   │   └── ui/              ← UI library components
-│   │   └── lib/                 ← Utilities
-│   │       ├── auth.ts          ← Authentication logic
-│   │       └── storage.ts       ← LocalStorage utilities
-│   └── styles/                  ← CSS files
-│       ├── tailwind.css
-│       ├── theme.css            ← Color scheme
-│       └── ...
-├── README.md                     ← Full documentation
-├── ARCHITECTURE.md               ← Technical architecture
-├── DEMO_ACCOUNTS.md              ← Demo credentials
-└── package.json                  ← Dependencies
+1. Open Skyway Suites app
+2. Go to Settings (⚙️ icon)
+3. Click "Database Settings" tab
+4. Paste:
+   - Project URL → Supabase Project URL field
+   - anon key → Supabase Anon Key field
+5. Click "Test Connection"
+6. Wait for ✅ "Connection Successful"
+7. Click "Save Settings"
+```
+
+### 5. Verify Everything Works (30 seconds)
+```
+✅ Check these:
+- No red "No Internet Connection" banner at top
+- Settings shows "Database: Connected ✓"
+- Green badge says "Connected" in Database Settings
+
+🧪 Test:
+- Add a test property
+- Check Supabase → Table Editor → skyway_properties
+- Should see your property there!
 ```
 
 ---
 
-## 🎨 Customization
+## 🆘 Quick Troubleshooting
 
-### Change Color Scheme
+### ❌ "Connection Failed" Error
+**Fix:**
+1. Check Project URL format: `https://xxxxx.supabase.co` (no extra paths)
+2. Check API key is the **anon/public** key (not service_role)
+3. Verify project isn't paused (Supabase dashboard should show "Active")
 
-Edit `/src/styles/theme.css`:
+### ❌ "Table does not exist" Error
+**Fix:**
+1. Go back to Supabase SQL Editor
+2. Re-run the schema file `/database/skyway_suites_schema.sql`
+3. Check Supabase → Table Editor → Should see 9 tables
 
-```css
-:root {
-  --charcoal-grey: #36454F;  /* Primary dark color */
-  --olive-green: #6B7F39;    /* Accent color */
-  --warm-beige: #FAF4EC;     /* Background color */
-}
-```
-
-### Add New Property Category
-
-1. Login as admin
-2. Go to **Dashboard → Properties**
-3. Scroll to **"Property Categories"** section
-4. Enter new category name
-5. Click **"Add Category"**
-
-### Create Custom Pages
-
-1. Login as admin
-2. Navigate to **Menu Pages Manager**
-3. Click **"Create New Page"**
-4. Fill in:
-   - Title: "About Us"
-   - Slug: "about" (URL will be /page/about)
-   - Content: Use rich text editor
-5. Toggle **"Visible in Menu"**
-6. Click **"Create Page"**
+### ❌ "No Internet Connection" Won't Go Away
+**Fix:**
+1. Check your actual internet connection (open google.com)
+2. Disable VPN if using one
+3. Try different network (mobile hotspot)
+4. Check browser console for errors (F12)
 
 ---
 
-## 🔧 Common Tasks
+## 📊 What You Get
 
-### Build for Production
+### 9 Database Tables Created:
+1. ✅ **skyway_categories** - Property types (Apartment, Villa, etc.)
+2. ✅ **skyway_features** - Amenities (WiFi, Pool, etc.)
+3. ✅ **skyway_auth_user** - User accounts (Admin, Manager, Customer)
+4. ✅ **skyway_customers** - Customer information
+5. ✅ **skyway_properties** - Property listings
+6. ✅ **skyway_bookings** - Booking records
+7. ✅ **skyway_activity_logs** - Audit trail
+8. ✅ **skyway_menu_pages** - Custom pages
+9. ✅ **skyway_settings** - App configuration
 
-```bash
-# Create optimized production build
-npm run build
-
-# Preview production build
-npm run preview
-```
-
-### Clear All Data
-
-Open browser console and run:
-
-```javascript
-// Clear all localStorage data
-localStorage.clear();
-location.reload();
-```
-
-### Export Data
-
-```javascript
-// In browser console
-const data = {
-  properties: localStorage.getItem('skyway_properties'),
-  bookings: localStorage.getItem('skyway_bookings'),
-  // ... other keys
-};
-console.log(JSON.stringify(data, null, 2));
-```
+### Smart Features:
+- ⚡ Auto-payment status updates
+- 🔄 Real-time synchronization
+- 🚫 Double booking prevention
+- ✅ Auto-confirmation on full payment
+- 📝 Complete activity logging
+- 🔒 Row Level Security ready
 
 ---
 
-## 🐛 Troubleshooting
+## 🎯 Next Steps
 
-### Port Already in Use
+1. **Add Test Data**
+   - Create 2-3 sample properties
+   - Add a few customers
+   - Make a test booking
 
-If port 5173 is busy:
+2. **Configure Settings**
+   - Update company information (General Settings tab)
+   - Set up SMS provider (SMS Integration tab)
+   - Customize homepage (Home Page tab)
 
-```bash
-# Kill process using port 5173
-# On Linux/Mac:
-lsof -ti:5173 | xargs kill -9
+3. **Invite Team Members**
+   - Go to User Management tab
+   - Add Admin/Manager accounts
+   - Assign appropriate roles
 
-# On Windows:
-netstat -ano | findstr :5173
-taskkill /PID <PID> /F
-```
-
-### Dependencies Not Installing
-
-```bash
-# Clear cache and reinstall
-rm -rf node_modules package-lock.json
-npm install
-
-# OR
-rm -rf node_modules pnpm-lock.yaml
-pnpm install
-```
-
-### Images Not Loading
-
-- Check browser console for errors
-- Verify images are optimized to WebP
-- Check localStorage size (max ~5-10MB depending on browser)
-
-### Data Not Persisting
-
-- Check if cookies/localStorage are enabled
-- Verify not in incognito/private mode
-- Check browser storage quota
+4. **Go Live!**
+   - Add real properties
+   - Start taking bookings
+   - Monitor activity logs
 
 ---
 
-## 📚 Next Steps
+## 📞 Need Help?
 
-### Learn More
-1. Read **[README.md](./README.md)** for complete feature documentation
-2. Check **[ARCHITECTURE.md](./ARCHITECTURE.md)** for technical details
-3. Review **[DEMO_ACCOUNTS.md](./DEMO_ACCOUNTS.md)** for testing credentials
+📖 **Full Documentation**: See `/MIGRATION_TO_SUPABASE.md`
 
-### Add Features
-- Implement email notifications
-- Add customer reviews system
-- Integrate real payment gateway (M-Pesa API)
-- Add SMS notifications
-- Create analytics dashboard
+🌐 **Supabase Docs**: https://supabase.com/docs
 
-### Deploy to Production
-1. Build the app: `npm run build`
-2. Upload `dist/` folder to hosting (Vercel, Netlify, etc.)
-3. Configure environment variables
-4. Set up custom domain
-5. Enable HTTPS
+💬 **Support**:
+- Email: info@skywaysuites.co.ke
+- Phone: +254 700 123 456
 
 ---
 
-## 💡 Pro Tips
-
-### Development Tips
-- Use React DevTools for debugging
-- Enable hot reload for faster development
-- Use browser localStorage inspector to view data
-- Test on different screen sizes (responsive)
-
-### Data Management
-- Regularly export data for backup
-- Test with realistic data volumes
-- Monitor localStorage size limits
-- Consider backend migration for scale
-
-### Testing
-- Test all user flows (customer and admin)
-- Verify responsive design on mobile
-- Check cross-browser compatibility
-- Test with different data scenarios
-
----
-
-## 🆘 Getting Help
-
-### Resources
-- **Documentation**: Check README.md and ARCHITECTURE.md
-- **Demo Accounts**: See DEMO_ACCOUNTS.md
-- **Code Comments**: Review inline code comments
-
-### Support
-- 📧 Email: support@skywaysuites.co.ke
-- 💬 WhatsApp: Available through the platform
-
----
-
-## ✅ Checklist for First-Time Setup
-
-- [ ] Node.js 18+ installed
-- [ ] Dependencies installed (`npm install`)
-- [ ] Dev server running (`npm run dev`)
-- [ ] Accessed app at http://localhost:5173
-- [ ] Logged in with admin account
-- [ ] Created first property
-- [ ] Made first booking
-- [ ] Processed first payment
-- [ ] Explored all admin sections
-- [ ] Tested customer view
-- [ ] Reviewed documentation
-
----
-
-## 🎉 You're Ready!
-
-You now have Skyway Suites running locally. Start building amazing property rental experiences for the Kenyan market!
-
-**Happy Coding! 🚀**
-
----
-
-**Version**: 2.35  
-**Last Updated**: 2024
+**That's it! You're ready to go! 🎉**

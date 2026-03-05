@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Building2,
   Users,
-  Database,
   MessageSquare,
   Save,
   Upload,
@@ -20,8 +19,6 @@ import {
   Phone,
   MapPin,
   DollarSign,
-  HardDrive,
-  Server,
   Send,
   Settings as SettingsIcon,
   CheckCircle2,
@@ -36,14 +33,17 @@ import {
   List,
   Activity,
   Globe,
-  Wifi,
-  WifiOff,
-  Loader2,
   AlertCircle,
   Info,
   CreditCard,
   FileText,
-  Calendar
+  Calendar,
+  Database,
+  Server,
+  Wifi,
+  WifiOff,
+  Loader2,
+  HardDrive
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -55,21 +55,21 @@ import { getCurrentUser } from '../lib/auth';
 
 type SettingsTab = 'general' | 'homepage' | 'users' | 'database' | 'sms';
 
-const APP_VERSION = '2.35'; // Format: Version 235 = 2.35
+const APP_VERSION = '3.0'; // Format: Version 3.0
 
 export function Settings() {
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  
+  // Check URL parameter for tab
+  const urlParams = new URLSearchParams(window.location.search);
+  const tabFromUrl = urlParams.get('tab') as SettingsTab | null;
+  
+  const [activeTab, setActiveTab] = useState<SettingsTab>(tabFromUrl || 'general');
   
   // Activity Log State
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
-  
-  // Database Connection States
-  const [dbConnectionStatus, setDbConnectionStatus] = useState<'disconnected' | 'connected' | 'testing'>('disconnected');
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [showErrorPopup, setShowErrorPopup] = useState(false);
 
   // Modal States
   const [modalState, setModalState] = useState<{
@@ -192,23 +192,14 @@ export function Settings() {
 
   // Database Settings States
   const [dbSettings, setDbSettings] = useState({
-    dbType: 'local',
-    remoteProvider: 'supabase',
-    supabase: {
-      url: '',
-      anonKey: '',
-      serviceRoleKey: ''
-    },
-    cpanel: {
-      host: '',
-      database: '',
-      username: '',
-      password: '',
-      port: '3306'
-    },
-    autoBackup: true,
-    backupInterval: '24'
+    supabaseUrl: '',
+    supabaseAnonKey: '',
+    supabaseServiceKey: '',
+    connectionStatus: 'disconnected' as 'connected' | 'disconnected' | 'connecting' | 'error'
   });
+  const [dbConnectionStatus, setDbConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting' | 'error'>('disconnected');
+  const [connectionError, setConnectionError] = useState('');
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
 
   // SMS Settings States
   const [smsProvider, setSmsProvider] = useState('africastalking');
@@ -247,11 +238,6 @@ export function Settings() {
       setUsers(JSON.parse(savedUsers));
     }
 
-    const savedDbSettings = localStorage.getItem('skyway_db_settings');
-    if (savedDbSettings) {
-      setDbSettings(JSON.parse(savedDbSettings));
-    }
-
     const savedSmsSettings = localStorage.getItem('skyway_sms_settings');
     if (savedSmsSettings) {
       const settings = JSON.parse(savedSmsSettings);
@@ -287,55 +273,6 @@ export function Settings() {
     localStorage.setItem('skyway_general_settings', JSON.stringify(generalSettings));
     logActivity('Settings Updated', 'General settings saved');
     showModal('success', 'Settings Saved', 'General settings saved successfully!');
-  };
-
-  // Test Database Connection
-  const handleTestConnection = async () => {
-    setDbConnectionStatus('testing');
-    setConnectionError(null);
-    
-    try {
-      // Simulate connection test
-      await new Promise((resolve, reject) => {
-        setTimeout(() => {
-          // Validate credentials are filled
-          if (dbSettings.remoteProvider === 'supabase') {
-            if (!dbSettings.supabase.url || !dbSettings.supabase.anonKey) {
-              reject(new Error('Supabase URL and Anon Key are required'));
-              return;
-            }
-          } else if (dbSettings.remoteProvider === 'cpanel') {
-            if (!dbSettings.cpanel.host || !dbSettings.cpanel.database || !dbSettings.cpanel.username) {
-              reject(new Error('Host, Database, and Username are required'));
-              return;
-            }
-          }
-          
-          // Simulate successful connection (in real app, this would make actual API call)
-          resolve(true);
-        }, 2000);
-      });
-      
-      setDbConnectionStatus('connected');
-      logActivity('Database Connected', `Successfully connected to ${dbSettings.remoteProvider}`);
-    } catch (error: any) {
-      setDbConnectionStatus('disconnected');
-      setConnectionError(error.message || 'Failed to connect to database');
-      setShowErrorPopup(true);
-      logActivity('Database Connection Failed', error.message);
-      
-      // Auto-hide error after 5 seconds
-      setTimeout(() => {
-        setShowErrorPopup(false);
-      }, 5000);
-    }
-  };
-
-  // Disconnect Database
-  const handleDisconnect = () => {
-    setDbConnectionStatus('disconnected');
-    setConnectionError(null);
-    logActivity('Database Disconnected', `Disconnected from ${dbSettings.remoteProvider}`);
   };
 
   // Save Home Page Settings
@@ -518,12 +455,138 @@ export function Settings() {
     );
   };
 
-  // Database Settings
-  const handleSaveDbSettings = () => {
-    localStorage.setItem('skyway_db_settings', JSON.stringify(dbSettings));
-    logActivity('Settings Updated', 'Database settings saved');
-    showModal('success', 'Settings Saved', 'Database settings saved successfully!');
+  // Test Supabase Connection
+  const handleTestConnection = async () => {
+    if (!dbSettings.supabaseUrl || !dbSettings.supabaseAnonKey) {
+      setConnectionError('Please provide Supabase URL and Anon Key');
+      setDbConnectionStatus('error');
+      setShowErrorPopup(true);
+      setTimeout(() => setShowErrorPopup(false), 5000);
+      return;
+    }
+
+    setDbConnectionStatus('connecting');
+    setConnectionError('');
+    setShowErrorPopup(false);
+
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(dbSettings.supabaseUrl, dbSettings.supabaseAnonKey);
+      
+      // Test connection by querying settings table
+      const { data, error } = await supabase
+        .from('skyway_settings')
+        .select('setting_id')
+        .limit(1);
+
+      if (error) throw error;
+
+      setDbConnectionStatus('connected');
+      showModal('success', 'Connection Successful', 'Successfully connected to Supabase database!');
+      logActivity('Database Connected', 'Supabase connection established');
+    } catch (error: any) {
+      console.error('Connection error:', error);
+      setConnectionError(error.message || 'Connection failed');
+      setDbConnectionStatus('error');
+      setShowErrorPopup(true);
+      setTimeout(() => setShowErrorPopup(false), 5000);
+      showModal('error', 'Connection Failed', `Failed to connect to Supabase: ${error.message}`);
+    }
   };
+
+  // Save Database Settings to Supabase
+  const handleSaveDbSettings = async () => {
+    try {
+      // Save to Supabase settings table so it's accessible across all devices
+      const { createClient } = await import('@supabase/supabase-js');
+      
+      if (!dbSettings.supabaseUrl || !dbSettings.supabaseAnonKey) {
+        showModal('error', 'Missing Credentials', 'Please provide Supabase URL and Anon Key');
+        return;
+      }
+
+      const supabase = createClient(dbSettings.supabaseUrl, dbSettings.supabaseAnonKey);
+      
+      // Save each setting individually to skyway_settings table
+      const settingsToSave = [
+        { category: 'database', key: 'supabase_url', value: dbSettings.supabaseUrl },
+        { category: 'database', key: 'supabase_anon_key', value: dbSettings.supabaseAnonKey },
+        { category: 'database', key: 'supabase_service_key', value: dbSettings.supabaseServiceKey || '' }
+      ];
+
+      for (const setting of settingsToSave) {
+        // Upsert settings (insert or update if exists)
+        const { error } = await supabase
+          .from('skyway_settings')
+          .upsert({
+            category: setting.category,
+            key: setting.key,
+            value: setting.value,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'category,key'
+          });
+
+        if (error) {
+          console.error('Error saving setting:', setting.key, error);
+        }
+      }
+
+      // Also save to localStorage as backup for initial load
+      localStorage.setItem('skyway_db_settings', JSON.stringify(dbSettings));
+      
+      logActivity('Settings Updated', 'Database settings saved to cloud');
+      showModal('success', 'Settings Saved', 'Database settings saved successfully and synced across all devices!');
+    } catch (error: any) {
+      console.error('Error saving settings:', error);
+      // Fallback to localStorage only
+      localStorage.setItem('skyway_db_settings', JSON.stringify(dbSettings));
+      showModal('error', 'Save Error', `Settings saved locally only: ${error.message}`);
+    }
+  };
+
+  // Load database settings from Supabase or localStorage
+  useEffect(() => {
+    const loadDbSettings = async () => {
+      try {
+        // First try localStorage for initial credentials
+        const savedDbSettings = localStorage.getItem('skyway_db_settings');
+        if (savedDbSettings) {
+          const localSettings = JSON.parse(savedDbSettings);
+          setDbSettings(localSettings);
+
+          // Then try to load from Supabase if we have credentials
+          if (localSettings.supabaseUrl && localSettings.supabaseAnonKey) {
+            const { createClient } = await import('@supabase/supabase-js');
+            const supabase = createClient(localSettings.supabaseUrl, localSettings.supabaseAnonKey);
+
+            const { data, error } = await supabase
+              .from('skyway_settings')
+              .select('*')
+              .eq('category', 'database');
+
+            if (!error && data && data.length > 0) {
+              // Override with Supabase settings
+              const cloudSettings = {
+                supabaseUrl: data.find(s => s.key === 'supabase_url')?.value || localSettings.supabaseUrl,
+                supabaseAnonKey: data.find(s => s.key === 'supabase_anon_key')?.value || localSettings.supabaseAnonKey,
+                supabaseServiceKey: data.find(s => s.key === 'supabase_service_key')?.value || localSettings.supabaseServiceKey,
+                connectionStatus: localSettings.connectionStatus
+              };
+              setDbSettings(cloudSettings);
+              
+              // Update localStorage with cloud settings
+              localStorage.setItem('skyway_db_settings', JSON.stringify(cloudSettings));
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading database settings:', error);
+      }
+    };
+
+    loadDbSettings();
+  }, []);
 
   // Backup Database
   const handleBackupDatabase = (format: 'json' | 'sql') => {
@@ -536,7 +599,6 @@ export function Settings() {
       settings: {
         general: generalSettings,
         homepage: homePageSettings,
-        db: dbSettings,
         sms: {
           provider: smsProvider,
           africastalking: africastalkingSettings,
@@ -616,10 +678,6 @@ export function Settings() {
                 localStorage.setItem('skyway_homepage_settings', JSON.stringify(data.settings.homepage));
                 setHomePageSettings(data.settings.homepage);
               }
-              if (data.settings.db) {
-                localStorage.setItem('skyway_db_settings', JSON.stringify(data.settings.db));
-                setDbSettings(data.settings.db);
-              }
               if (data.settings.sms) {
                 localStorage.setItem('skyway_sms_settings', JSON.stringify(data.settings.sms));
               }
@@ -692,7 +750,7 @@ export function Settings() {
     { id: 'general', label: 'General Settings', icon: Building2, color: 'from-blue-500 to-blue-600', bgColor: 'bg-blue-50', textColor: 'text-blue-600' },
     { id: 'homepage', label: 'Home Page', icon: Home, color: 'from-indigo-500 to-indigo-600', bgColor: 'bg-indigo-50', textColor: 'text-indigo-600' },
     { id: 'users', label: 'User Management', icon: Users, color: 'from-green-500 to-green-600', bgColor: 'bg-green-50', textColor: 'text-green-600' },
-    { id: 'database', label: 'Database', icon: Database, color: 'from-purple-500 to-purple-600', bgColor: 'bg-purple-50', textColor: 'text-purple-600' },
+    { id: 'database', label: 'Database Settings', icon: Database, color: 'from-purple-500 to-purple-600', bgColor: 'bg-purple-50', textColor: 'text-purple-600' },
     { id: 'sms', label: 'SMS Integration', icon: MessageSquare, color: 'from-orange-500 to-orange-600', bgColor: 'bg-orange-50', textColor: 'text-orange-600' }
   ];
 
@@ -704,9 +762,9 @@ export function Settings() {
     admins: users.filter(u => u.role === 'Admin').length,
     managers: users.filter(u => u.role === 'Manager').length,
     customers: users.filter(u => u.role === 'Customer').length,
-    dbType: dbSettings.dbType,
     smsProvider: smsProvider,
-    totalSlides: homePageSettings.slides.length
+    totalSlides: homePageSettings.slides.length,
+    dbStatus: dbConnectionStatus
   };
 
   return (
@@ -857,9 +915,9 @@ export function Settings() {
                   <p className="text-xs opacity-80">Total Users</p>
                 </div>
                 <div className="bg-gradient-to-br from-[#36454F] to-[#2a3640] rounded-2xl p-3 text-white shadow-lg">
-                  <CheckCircle2 className="w-5 h-5 mb-1 opacity-80" />
-                  <p className="text-2xl font-bold">{dbSettings.dbType === 'local' ? 'Local' : 'Remote'}</p>
-                  <p className="text-xs opacity-80">Database</p>
+                  <Home className="w-5 h-5 mb-1 opacity-80" />
+                  <p className="text-2xl font-bold">{stats.totalSlides}</p>
+                  <p className="text-xs opacity-80">Slides</p>
                 </div>
               </div>
             </div>
@@ -882,7 +940,7 @@ export function Settings() {
               </div>
 
               {/* Navigation Items */}
-              <nav className="p-4 space-y-2">
+              <nav className="p-2 space-y-1">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -894,23 +952,23 @@ export function Settings() {
                         isActive ? 'transform scale-105' : ''
                       }`}
                     >
-                      <div className={`relative flex items-center gap-4 px-5 py-4 rounded-2xl font-medium transition-all duration-300 ${
+                      <div className={`relative flex items-center gap-2 px-2 py-1.5 rounded-lg font-medium transition-all duration-300 ${
                         isActive
                           ? `bg-gradient-to-r ${tab.color} text-white shadow-lg`
                           : `${tab.bgColor} ${tab.textColor} hover:shadow-md`
                       }`}>
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                        <div className={`w-4 h-4 rounded-lg flex items-center justify-center ${
                           isActive ? 'bg-white/20' : 'bg-white'
                         } transition-all duration-300`}>
-                          <Icon className={`w-5 h-5 ${isActive ? 'text-white' : tab.textColor}`} />
+                          <Icon className={`w-2.5 h-2.5 ${isActive ? 'text-white' : tab.textColor}`} />
                         </div>
                         <div className="text-left flex-1">
-                          <p className={`font-semibold text-sm ${isActive ? 'text-white' : ''}`}>
+                          <p className={`font-semibold text-xs ${isActive ? 'text-white' : ''}`}>
                             {tab.label}
                           </p>
                         </div>
                         {isActive && (
-                          <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+                          <div className="w-1 h-1 rounded-full bg-white animate-pulse"></div>
                         )}
                       </div>
                     </button>
@@ -937,7 +995,7 @@ export function Settings() {
                         {activeTab === 'general' && 'Configure your company information and preferences'}
                         {activeTab === 'homepage' && `Managing ${stats.totalSlides} slides and home page content`}
                         {activeTab === 'users' && `Managing ${stats.totalUsers} users across the platform`}
-                        {activeTab === 'database' && `Connected to ${dbSettings.dbType} storage`}
+                        {activeTab === 'database' && `Database: ${dbConnectionStatus === 'connected' ? 'Connected ✓' : 'Disconnected'}`}
                         {activeTab === 'sms' && `Using ${smsProvider} for SMS communications`}
                       </p>
                     </div>
@@ -1654,414 +1712,200 @@ export function Settings() {
                 </div>
               )}
 
-              {/* Database Settings Tab - Same as before, keeping it intact */}
+              {/* Database Settings Tab */}
               {activeTab === 'database' && (
                 <div className="space-y-6">
-                  {/* Backup and Restore Card */}
+                  {/* Connection Status Card */}
+                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
+                    <div className="p-6 bg-gradient-to-r from-purple-50 to-purple-100 border-b-2 border-purple-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
+                            <Database className="w-5 h-5 text-white" />
+                          </div>
+                          <h3 className="text-xl font-bold text-purple-900">Supabase Connection Status</h3>
+                        </div>
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold ${
+                          dbConnectionStatus === 'connected' 
+                            ? 'bg-green-100 text-green-700' 
+                            : dbConnectionStatus === 'connecting'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : dbConnectionStatus === 'error'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {dbConnectionStatus === 'connected' && <Wifi className="w-4 h-4" />}
+                          {dbConnectionStatus === 'connecting' && <Loader2 className="w-4 h-4 animate-spin" />}
+                          {dbConnectionStatus === 'error' && <WifiOff className="w-4 h-4" />}
+                          {dbConnectionStatus === 'disconnected' && <WifiOff className="w-4 h-4" />}
+                          {dbConnectionStatus === 'connected' ? 'Connected' : dbConnectionStatus === 'connecting' ? 'Connecting...' : dbConnectionStatus === 'error' ? 'Error' : 'Disconnected'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-6">
+                      {connectionError && (
+                        <div className="mb-4 p-4 bg-red-50 border-2 border-red-200 rounded-xl">
+                          <div className="flex items-center gap-2 text-red-700">
+                            <AlertCircle className="w-5 h-5" />
+                            <p className="font-medium">{connectionError}</p>
+                          </div>
+                        </div>
+                      )}
+                      <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
+                        <div className="flex items-start gap-3">
+                          <Info className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+                          <div className="text-sm text-purple-800">
+                            <p className="font-semibold mb-2">Important: Strictly Cloud-Based Application</p>
+                            <p className="mb-2">Skyway Suites Version 3.0 operates entirely on Supabase cloud infrastructure. All data is stored online and requires an active internet connection.</p>
+                            <ul className="list-disc list-inside space-y-1 ml-2">
+                              <li>No offline mode available</li>
+                              <li>Database settings saved to cloud (accessible from any device)</li>
+                              <li>Real-time synchronization across all devices</li>
+                              <li>Automatic backups and data security</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Supabase Configuration Card */}
                   <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
                     <div className="p-6 bg-gradient-to-r from-purple-50 to-purple-100 border-b-2 border-purple-200">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
-                          <Database className="w-5 h-5 text-white" />
-                        </div>
-                        <h3 className="text-xl font-bold text-purple-900">Backup & Restore</h3>
-                      </div>
-                    </div>
-                    <div className="p-6">
-                      <div className="grid md:grid-cols-2 gap-6">
-                        {/* Create Backup */}
-                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border-2 border-green-200">
-                          <h4 className="font-bold text-green-900 mb-4 flex items-center gap-2">
-                            <Download className="w-5 h-5" />
-                            Create Backup
-                          </h4>
-                          <div className="space-y-3">
-                            <Button
-                              onClick={() => handleBackupDatabase('json')}
-                              className="w-full bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] rounded-xl h-12 shadow-md"
-                            >
-                              <Download className="w-4 h-4 mr-2" />
-                              Download JSON Backup
-                            </Button>
-                            <Button
-                              onClick={() => handleBackupDatabase('sql')}
-                              variant="outline"
-                              className="w-full border-2 border-blue-500 text-blue-600 hover:bg-blue-50 rounded-xl h-12"
-                            >
-                              <Download className="w-4 h-4 mr-2" />
-                              Download SQL Backup
-                            </Button>
-                          </div>
-                          <p className="text-xs text-green-700 mt-4">
-                            Export all your data including properties, bookings, and customers
-                          </p>
-                        </div>
-
-                        {/* Restore Database */}
-                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 border-2 border-orange-200">
-                          <h4 className="font-bold text-orange-900 mb-4 flex items-center gap-2">
-                            <Upload className="w-5 h-5" />
-                            Restore Database
-                          </h4>
-                          <input
-                            type="file"
-                            accept=".json"
-                            onChange={handleRestoreDatabase}
-                            className="hidden"
-                            id="restore-upload"
-                          />
-                          <label htmlFor="restore-upload">
-                            <Button 
-                              variant="outline" 
-                              className="w-full border-2 border-orange-500 text-orange-600 hover:bg-orange-50 rounded-xl h-12" 
-                              asChild
-                            >
-                              <span className="flex items-center justify-center gap-2">
-                                <Upload className="w-4 h-4" />
-                                Restore from JSON
-                              </span>
-                            </Button>
-                          </label>
-                          <p className="text-xs text-orange-700 mt-4">
-                            ⚠️ Warning: This will overwrite all current data
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Database Connection Card */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-indigo-50 to-indigo-100 border-b-2 border-indigo-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md">
                           <Server className="w-5 h-5 text-white" />
                         </div>
-                        <h3 className="text-xl font-bold text-indigo-900">Database Connection</h3>
+                        <h3 className="text-xl font-bold text-purple-900">Supabase Configuration</h3>
                       </div>
                     </div>
                     <div className="p-6 space-y-6">
-                      {/* Database Type */}
+                      {/* Supabase URL */}
                       <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Database Type
+                        <label className="block text-sm font-semibold text-gray-700">
+                          Supabase Project URL *
                         </label>
-                        <Select
-                          value={dbSettings.dbType}
-                          onValueChange={(value) => setDbSettings({...dbSettings, dbType: value})}
+                        <Input
+                          type="text"
+                          placeholder="https://xxxxx.supabase.co"
+                          value={dbSettings.supabaseUrl}
+                          onChange={(e) => setDbSettings({ ...dbSettings, supabaseUrl: e.target.value })}
+                          className="border-2 border-gray-200 focus:border-purple-500 rounded-xl h-12"
+                        />
+                        <p className="text-xs text-gray-500">Find this in your Supabase project settings</p>
+                      </div>
+
+                      {/* Supabase Anon Key */}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700">
+                          Supabase Anon/Public Key *
+                        </label>
+                        <Input
+                          type="password"
+                          placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                          value={dbSettings.supabaseAnonKey}
+                          onChange={(e) => setDbSettings({ ...dbSettings, supabaseAnonKey: e.target.value })}
+                          className="border-2 border-gray-200 focus:border-purple-500 rounded-xl h-12"
+                        />
+                        <p className="text-xs text-gray-500">Public/anon key (safe to use in frontend)</p>
+                      </div>
+
+                      {/* Supabase Service Role Key */}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700">
+                          Supabase Service Role Key (Optional)
+                        </label>
+                        <Input
+                          type="password"
+                          placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                          value={dbSettings.supabaseServiceKey}
+                          onChange={(e) => setDbSettings({ ...dbSettings, supabaseServiceKey: e.target.value })}
+                          className="border-2 border-gray-200 focus:border-purple-500 rounded-xl h-12"
+                        />
+                        <p className="text-xs text-gray-500">For admin operations (keep secure, backend only)</p>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-3 pt-4">
+                        <Button
+                          onClick={handleTestConnection}
+                          disabled={dbConnectionStatus === 'connecting'}
+                          className="flex-1 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 h-12"
                         >
-                          <SelectTrigger className="border-2 border-gray-200 focus:border-indigo-500 rounded-xl h-12">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="local">
-                              <span className="flex items-center gap-2">
-                                <HardDrive className="w-4 h-4 text-blue-500" />
-                                Local Storage
-                              </span>
-                            </SelectItem>
-                            <SelectItem value="remote">
-                              <span className="flex items-center gap-2">
-                                <Server className="w-4 h-4 text-green-500" />
-                                Remote Database
-                              </span>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Remote Database Settings */}
-                      {dbSettings.dbType === 'remote' && (
-                        <div className="space-y-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200">
-                          <div className="space-y-2">
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
-                              Remote Database Provider
-                            </label>
-                            <Select
-                              value={dbSettings.remoteProvider}
-                              onValueChange={(value) => setDbSettings({...dbSettings, remoteProvider: value})}
-                            >
-                              <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12 bg-white">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="supabase">
-                                  <span className="flex items-center gap-2">
-                                    <Database className="w-4 h-4 text-green-600" />
-                                    Supabase
-                                  </span>
-                                </SelectItem>
-                                <SelectItem value="cpanel">
-                                  <span className="flex items-center gap-2">
-                                    <Server className="w-4 h-4 text-orange-600" />
-                                    cPanel
-                                  </span>
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          {/* Supabase Settings */}
-                          {dbSettings.remoteProvider === 'supabase' && (
-                            <div className="space-y-4 bg-white rounded-xl p-5 border-2 border-green-200">
-                              <div className="flex items-center gap-2 mb-4">
-                                <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                                  <Database className="w-4 h-4 text-green-600" />
-                                </div>
-                                <h4 className="font-bold text-green-900">Supabase Configuration</h4>
-                              </div>
-                              
-                              <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                  <Server className="w-4 h-4 text-green-600" />
-                                  Supabase URL
-                                </label>
-                                <Input
-                                  value={dbSettings.supabase.url}
-                                  onChange={(e) => setDbSettings({...dbSettings, supabase: {...dbSettings.supabase, url: e.target.value}})}
-                                  placeholder="https://your-project.supabase.co"
-                                  className="border-2 border-gray-200 focus:border-green-500 rounded-xl h-12"
-                                />
-                              </div>
-
-                              <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                  <Shield className="w-4 h-4 text-blue-600" />
-                                  Anon Key
-                                </label>
-                                <Input
-                                  type="password"
-                                  value={dbSettings.supabase.anonKey}
-                                  onChange={(e) => setDbSettings({...dbSettings, supabase: {...dbSettings.supabase, anonKey: e.target.value}})}
-                                  placeholder="Enter Anon Key"
-                                  className="border-2 border-gray-200 focus:border-green-500 rounded-xl h-12"
-                                />
-                              </div>
-
-                              <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                  <Shield className="w-4 h-4 text-red-600" />
-                                  Service Role Key
-                                </label>
-                                <Input
-                                  type="password"
-                                  value={dbSettings.supabase.serviceRoleKey}
-                                  onChange={(e) => setDbSettings({...dbSettings, supabase: {...dbSettings.supabase, serviceRoleKey: e.target.value}})}
-                                  placeholder="Enter Service Role Key"
-                                  className="border-2 border-gray-200 focus:border-green-500 rounded-xl h-12"
-                                />
-                              </div>
-                            </div>
+                          {dbConnectionStatus === 'connecting' ? (
+                            <>
+                              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                              Testing Connection...
+                            </>
+                          ) : (
+                            <>
+                              <Wifi className="w-5 h-5 mr-2" />
+                              Test Connection
+                            </>
                           )}
-
-                          {/* cPanel Settings */}
-                          {dbSettings.remoteProvider === 'cpanel' && (
-                            <div className="space-y-4 bg-white rounded-xl p-5 border-2 border-orange-200">
-                              <div className="flex items-center gap-2 mb-4">
-                                <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
-                                  <Server className="w-4 h-4 text-orange-600" />
-                                </div>
-                                <h4 className="font-bold text-orange-900">cPanel Configuration</h4>
-                              </div>
-
-                              <div className="grid md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                    <Server className="w-4 h-4 text-orange-600" />
-                                    Host
-                                  </label>
-                                  <Input
-                                    value={dbSettings.cpanel.host}
-                                    onChange={(e) => setDbSettings({...dbSettings, cpanel: {...dbSettings.cpanel, host: e.target.value}})}
-                                    placeholder="localhost"
-                                    className="border-2 border-gray-200 focus:border-orange-500 rounded-xl h-12"
-                                  />
-                                </div>
-
-                                <div className="space-y-2">
-                                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                    <Database className="w-4 h-4 text-purple-600" />
-                                    Database
-                                  </label>
-                                  <Input
-                                    value={dbSettings.cpanel.database}
-                                    onChange={(e) => setDbSettings({...dbSettings, cpanel: {...dbSettings.cpanel, database: e.target.value}})}
-                                    placeholder="database_name"
-                                    className="border-2 border-gray-200 focus:border-orange-500 rounded-xl h-12"
-                                  />
-                                </div>
-
-                                <div className="space-y-2">
-                                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                    <UserCog className="w-4 h-4 text-blue-600" />
-                                    Username
-                                  </label>
-                                  <Input
-                                    value={dbSettings.cpanel.username}
-                                    onChange={(e) => setDbSettings({...dbSettings, cpanel: {...dbSettings.cpanel, username: e.target.value}})}
-                                    placeholder="db_user"
-                                    className="border-2 border-gray-200 focus:border-orange-500 rounded-xl h-12"
-                                  />
-                                </div>
-
-                                <div className="space-y-2">
-                                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                    <Shield className="w-4 h-4 text-red-600" />
-                                    Password
-                                  </label>
-                                  <Input
-                                    type="password"
-                                    value={dbSettings.cpanel.password}
-                                    onChange={(e) => setDbSettings({...dbSettings, cpanel: {...dbSettings.cpanel, password: e.target.value}})}
-                                    placeholder="••••••••"
-                                    className="border-2 border-gray-200 focus:border-orange-500 rounded-xl h-12"
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                  <Server className="w-4 h-4 text-indigo-600" />
-                                  Port
-                                </label>
-                                <Input
-                                  type="number"
-                                  value={dbSettings.cpanel.port}
-                                  onChange={(e) => setDbSettings({...dbSettings, cpanel: {...dbSettings.cpanel, port: e.target.value}})}
-                                  placeholder="3306"
-                                  className="border-2 border-gray-200 focus:border-orange-500 rounded-xl h-12"
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Connection Test Section */}
-                          {dbSettings.dbType === 'remote' && (
-                            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border-2 border-gray-200">
-                              <div className="flex items-center justify-between mb-4">
-                                <div>
-                                  <h4 className="font-bold text-gray-900 flex items-center gap-2 mb-1">
-                                    <Wifi className="w-5 h-5 text-gray-600" />
-                                    Connection Status
-                                  </h4>
-                                  <p className="text-sm text-gray-600">Test your remote database connection</p>
-                                </div>
-                                
-                                {/* Status Badge */}
-                                <div className={`px-4 py-2 rounded-xl font-semibold text-sm flex items-center gap-2 ${
-                                  dbConnectionStatus === 'connected' ? 'bg-green-100 text-green-700 border-2 border-green-300' :
-                                  dbConnectionStatus === 'testing' ? 'bg-yellow-100 text-yellow-700 border-2 border-yellow-300' :
-                                  'bg-red-100 text-red-700 border-2 border-red-300'
-                                }`}>
-                                  {dbConnectionStatus === 'connected' && <CheckCircle2 className="w-4 h-4" />}
-                                  {dbConnectionStatus === 'testing' && <Loader2 className="w-4 h-4 animate-spin" />}
-                                  {dbConnectionStatus === 'disconnected' && <WifiOff className="w-4 h-4" />}
-                                  {dbConnectionStatus === 'connected' ? 'Connected' : 
-                                   dbConnectionStatus === 'testing' ? 'Testing...' : 'Disconnected'}
-                                </div>
-                              </div>
-
-                              <div className="flex gap-3">
-                                {dbConnectionStatus === 'connected' ? (
-                                  <Button
-                                    onClick={handleDisconnect}
-                                    variant="outline"
-                                    className="flex-1 border-2 border-red-500 text-red-600 hover:bg-red-50 rounded-xl h-12 font-semibold"
-                                  >
-                                    <WifiOff className="w-4 h-4 mr-2" />
-                                    Disconnect
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    onClick={handleTestConnection}
-                                    disabled={dbConnectionStatus === 'testing'}
-                                    className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl h-12 font-semibold disabled:opacity-50"
-                                  >
-                                    {dbConnectionStatus === 'testing' ? (
-                                      <>
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        Testing Connection...
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Wifi className="w-4 h-4 mr-2" />
-                                        Test Connection
-                                      </>
-                                    )}
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Auto Backup Settings */}
-                      <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-5 border-2 border-yellow-200">
-                        <div className="flex items-center gap-3 mb-4">
-                          <input
-                            type="checkbox"
-                            id="autoBackup"
-                            checked={dbSettings.autoBackup}
-                            onChange={(e) => setDbSettings({...dbSettings, autoBackup: e.target.checked})}
-                            className="w-5 h-5 text-[#6B7F39] focus:ring-[#6B7F39] rounded border-2 border-gray-300"
-                          />
-                          <label htmlFor="autoBackup" className="text-sm font-semibold text-gray-700 cursor-pointer">
-                            Enable automatic backups
-                          </label>
-                        </div>
-
-                        {dbSettings.autoBackup && (
-                          <div className="space-y-2 pl-8">
-                            <label className="block text-sm font-semibold text-gray-700">
-                              Backup Interval (hours)
-                            </label>
-                            <Input
-                              type="number"
-                              value={dbSettings.backupInterval}
-                              onChange={(e) => setDbSettings({...dbSettings, backupInterval: e.target.value})}
-                              placeholder="24"
-                              className="border-2 border-gray-200 focus:border-yellow-500 rounded-xl h-12 bg-white"
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Save Button */}
-                      <div className="pt-4 border-t-2 border-gray-100">
-                        <Button 
+                        </Button>
+                        <Button
                           onClick={handleSaveDbSettings}
-                          className="w-full md:w-auto bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-6 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                          className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 h-12"
                         >
                           <Save className="w-5 h-5 mr-2" />
-                          Save Database Settings
+                          Save Settings
                         </Button>
+                      </div>
+                      
+                      {/* Cross-Device Sync Note */}
+                      <div className="mt-4 bg-green-50 border-2 border-green-200 rounded-xl p-3">
+                        <div className="flex items-start gap-2">
+                          <Globe className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-green-800">
+                            <span className="font-semibold">Cloud Sync Enabled:</span> Settings are automatically saved to Supabase and will be accessible from any device accessing this application.
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Database Query Card */}
+                  {/* Setup Instructions Card */}
                   <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-cyan-50 to-cyan-100 border-b-2 border-cyan-200">
+                    <div className="p-6 bg-gradient-to-r from-purple-50 to-purple-100 border-b-2 border-purple-200">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center shadow-md">
-                          <Eye className="w-5 h-5 text-white" />
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
+                          <HardDrive className="w-5 h-5 text-white" />
                         </div>
-                        <h3 className="text-xl font-bold text-cyan-900">Database Query</h3>
+                        <h3 className="text-xl font-bold text-purple-900">Setup Instructions</h3>
                       </div>
                     </div>
-                    <div className="p-6">
-                      <p className="text-sm text-gray-600 mb-4">
-                        Copy the current database data to clipboard in JSON format for inspection or debugging
-                      </p>
-                      <Button
-                        onClick={handleCopyDatabaseQuery}
-                        variant="outline"
-                        className="border-2 border-cyan-500 text-cyan-600 hover:bg-cyan-50 rounded-xl h-12"
-                      >
-                        <Copy className="w-4 h-4 mr-2" />
-                        Copy Database Data
-                      </Button>
+                    <div className="p-6 space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-3">
+                          <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 font-bold flex items-center justify-center flex-shrink-0 text-sm">1</div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900">Create Supabase Project</h4>
+                            <p className="text-sm text-gray-600">Go to <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">supabase.com</a> and create a new project</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 font-bold flex items-center justify-center flex-shrink-0 text-sm">2</div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900">Run Database Schema</h4>
+                            <p className="text-sm text-gray-600">Execute the SQL schema file (<code className="bg-gray-100 px-1 rounded">/database/skyway_suites_schema.sql</code>) in your Supabase SQL Editor</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 font-bold flex items-center justify-center flex-shrink-0 text-sm">3</div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900">Get API Keys</h4>
+                            <p className="text-sm text-gray-600">Copy your Project URL and API keys from Settings → API section</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 font-bold flex items-center justify-center flex-shrink-0 text-sm">4</div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900">Configure & Test</h4>
+                            <p className="text-sm text-gray-600">Enter your credentials above and click "Test Connection"</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
