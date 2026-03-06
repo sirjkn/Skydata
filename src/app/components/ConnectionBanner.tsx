@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { WifiOff, AlertCircle, Loader2, Settings, X } from 'lucide-react';
 import { subscribeToConnectionStatus, ConnectionStatus } from '../../lib/connectionStatus';
 import { Button } from './ui/button';
 
 export function ConnectionBanner() {
-  const navigate = useNavigate();
   const [status, setStatus] = useState<ConnectionStatus>({
     isOnline: true,
     isSupabaseConnected: true,
@@ -31,7 +29,8 @@ export function ConnectionBanner() {
   }
 
   const handleSetupDatabase = () => {
-    navigate('/settings?tab=database');
+    // Use window.location instead of navigate to avoid router context issues
+    window.location.href = '/settings?tab=database';
     setShowModal(false);
   };
 

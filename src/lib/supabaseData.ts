@@ -838,7 +838,7 @@ export async function fetchSettingByKey(category: string, key: string): Promise<
     .select('*')
     .eq('setting_category', category)
     .eq('setting_key', key)
-    .single();
+    .maybeSingle(); // Use maybeSingle() instead of single() to handle 0 rows gracefully
   
   if (error) {
     console.error('Error fetching setting:', error);

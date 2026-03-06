@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Building2, Mail, Lock, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
-import { login, DEMO_ACCOUNTS } from '../lib/auth';
+import { login } from '../lib/auth';
 
 export function Login() {
   const navigate = useNavigate();
@@ -47,14 +47,6 @@ export function Login() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDemoLogin = (accountType: 'admin' | 'user') => {
-    const account = DEMO_ACCOUNTS[accountType];
-    setFormData({
-      email: account.email,
-      password: account.password
-    });
   };
 
   return (

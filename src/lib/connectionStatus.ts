@@ -4,7 +4,7 @@
 import { getSupabaseClient, DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from './supabase';
 
 let isOnlineGlobal = navigator.onLine;
-let isSupabaseConnected = false;
+let isSupabaseConnected = true; // Start as true, will be updated by health checks
 let connectionCheckInterval: NodeJS.Timeout | null = null;
 
 // Initialize with default hard-coded credentials
@@ -133,12 +133,16 @@ export function stopConnectionMonitoring() {
 
 // Check if operations should be allowed
 export function canPerformOperations(): boolean {
-  return isOnlineGlobal && isSupabaseConnected;
+  // Allow operations if browser reports online
+  // Supabase operations will handle their own connection errors
+  return isOnlineGlobal;
 }
 
 // Alias for checkConnection (used in other files)
 export function checkConnection(): boolean {
-  return isOnlineGlobal && isSupabaseConnected;
+  // Allow operations if browser reports online
+  // Supabase operations will handle their own connection errors
+  return isOnlineGlobal;
 }
 
 // Get Supabase client (for external use)

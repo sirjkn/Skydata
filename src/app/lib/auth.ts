@@ -13,58 +13,15 @@ export interface User {
   role: 'Admin' | 'Manager' | 'Customer';
 }
 
-// Demo accounts for offline/testing mode
-export const DEMO_ACCOUNTS = {
-  admin: {
-    email: 'admin@skyway.com',
-    password: 'admin123',
-    user: {
-      id: '1',
-      email: 'admin@skyway.com',
-      name: 'Admin User',
-      role: 'Admin' as const
-    }
-  },
-  user: {
-    email: 'user@skyway.com',
-    password: 'user123',
-    user: {
-      id: '2',
-      email: 'user@skyway.com',
-      name: 'Demo User',
-      role: 'Customer' as const
-    }
-  }
-};
-
 const AUTH_STORAGE_KEY = 'skyway_auth_user';
 
 /**
  * Login user - Checks Supabase database for authentication
  */
 export async function login(email: string, password: string): Promise<User | null> {
-  // First check if trying to use demo accounts
-  if (email === DEMO_ACCOUNTS.admin.email && password === DEMO_ACCOUNTS.admin.password) {
-    const user = DEMO_ACCOUNTS.admin.user;
-    sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-    window.dispatchEvent(new Event('storage'));
-    window.dispatchEvent(new Event('authChange'));
-    console.warn('⚠️ Using demo admin account (offline mode)');
-    return user;
-  }
-  
-  if (email === DEMO_ACCOUNTS.user.email && password === DEMO_ACCOUNTS.user.password) {
-    const user = DEMO_ACCOUNTS.user.user;
-    sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-    window.dispatchEvent(new Event('storage'));
-    window.dispatchEvent(new Event('authChange'));
-    console.warn('⚠️ Using demo user account (offline mode)');
-    return user;
-  }
-
   // Check if connected for Supabase authentication
   if (!checkConnection()) {
-    console.error('Cannot login: No internet connection - Supabase accounts require connection');
+    console.error('Cannot login: No internet connection - Skyway Suites requires internet connection');
     return null;
   }
 

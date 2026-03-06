@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { 
   Building2, 
   Users, 
@@ -231,6 +231,7 @@ export function AdminDashboard() {
   // Connection status
   const [isOnline, setIsOnline] = useState(checkConnection());
   const [payments, setPayments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Property form state
   const [propertyForm, setPropertyForm] = useState({
@@ -476,27 +477,9 @@ export function AdminDashboard() {
     };
   }, []);
 
-  // Load all data from Supabase or use demo data
+  // Load all data from Supabase
   useEffect(() => {
     const loadAllData = async () => {
-      // Check if we're using demo accounts (offline mode)
-      const currentUser = getCurrentUser();
-      const isDemoMode = currentUser?.email === 'admin@skyway.com' || currentUser?.email === 'user@skyway.com';
-      
-      if (isDemoMode) {
-        console.log('⚠️ Demo mode detected - Using demo data instead of Supabase');
-        // Set empty demo data for now
-        setCategories(['Apartment', 'Villa', 'Townhouse', 'Studio', 'Penthouse']);
-        setFeatures(['WiFi', 'Parking', 'Pool', 'Gym', 'Security', 'Generator']);
-        setProperties([]);
-        setBookings([]);
-        setCustomers([]);
-        setPayments([]);
-        setActivityLogs([]);
-        setIsLoading(false);
-        return;
-      }
-      
       if (!isOnline) {
         console.log('⚠️ Offline - Cannot load data');
         setIsLoading(false);

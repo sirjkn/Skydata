@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Building2, LogOut, Menu, X, ExternalLink } from 'lucide-react';
 import { Button } from './ui/button';
 import { getCurrentUser, logout, isAdmin } from '../lib/auth';
