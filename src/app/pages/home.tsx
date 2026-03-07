@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { fetchProperties, fetchBookings } from '../../lib/supabaseData';
+import { fetchProperties, fetchBookings, fetchCategories } from '../../lib/cachedSupabaseData';
 import { getHomePageSettings, getGeneralSettings } from '../lib/settingsHelpers';
 import { ConnectionStatusBanner } from '../components/connection-status';
 import Slider from 'react-slick';
@@ -113,6 +113,8 @@ export function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [homePageSettings, setHomePageSettings] = useState<any>(null);
   const [generalSettings, setGeneralSettings] = useState<any>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [categories, setCategories] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -183,9 +185,10 @@ export function Home() {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const [loadedProperties, loadedBookings] = await Promise.all([
+        const [loadedProperties, loadedBookings, loadedCategories] = await Promise.all([
           fetchProperties(),
-          fetchBookings()
+          fetchBookings(),
+          fetchCategories()
         ]);
         
         // Convert Supabase format to app format
@@ -216,10 +219,12 @@ export function Home() {
         
         setProperties(formattedProperties);
         setBookings(formattedBookings);
+        setCategories(loadedCategories);
       } catch (error) {
         console.error('Failed to load data:', error);
         setProperties([]);
         setBookings([]);
+        setCategories([]);
       } finally {
         setIsLoading(false);
       }
@@ -301,9 +306,44 @@ export function Home() {
             <h2 className="text-3xl md:text-4xl font-bold text-[#36454F] mb-4">
               {homePageSettings?.propertiesTitle || 'Featured Properties'}
             </h2>
-            <p className="text-gray-600 text-lg">
+            <p className="text-gray-600 text-lg mb-8">
               {homePageSettings?.propertiesSubtitle || 'Handpicked premium properties just for you'}
             </p>
+
+            {/* Category Filter Tabs */}
+            <div className="flex flex-wrap justify-center gap-3 mt-8">
+              <Button
+                variant={selectedCategory === 'all' ? 'default' : 'outline'}
+                className={`rounded-full px-6 py-2 transition-all duration-300 ${
+                  selectedCategory === 'all'
+                    ? 'bg-[#6B7F39] hover:bg-[#5a6930] text-white'
+                    : 'border-[#6B7F39] text-[#6B7F39] hover:bg-[#6B7F39] hover:text-white'
+                }`}
+                onClick={() => setSelectedCategory('all')}
+              >
+                All Properties
+              </Button>
+              {categories
+                .filter((category) => {
+                  // Only show categories that have at least one property
+                  return properties.some((property) => String(property.category) === String(category.category_id));
+                })
+                .map((category) => (
+                  <Button
+                    key={category.category_id}
+                    variant={selectedCategory === String(category.category_id) ? 'default' : 'outline'}
+                    className={`rounded-full px-6 py-2 transition-all duration-300 ${
+                      selectedCategory === String(category.category_id)
+                        ? 'bg-[#6B7F39] hover:bg-[#5a6930] text-white'
+                        : 'border-[#6B7F39] text-[#6B7F39] hover:bg-[#6B7F39] hover:text-white'
+                    }`}
+                    onClick={() => setSelectedCategory(String(category.category_id))}
+                  >
+                    {category.category_name}
+                  </Button>
+                ))
+              }
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -318,6 +358,11 @@ export function Home() {
               </div>
             ) : properties.length > 0 ? (
               properties
+                .filter((property) => {
+                  // Apply category filter
+                  if (selectedCategory === 'all') return true;
+                  return String(property.category) === selectedCategory;
+                })
                 .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
                 .slice(0, 8)
                 .map((property) => {

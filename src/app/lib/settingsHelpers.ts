@@ -1,7 +1,7 @@
 /**
  * Settings Helper Functions for Skyway Suites
  * Provides easy-to-use functions for managing settings in Supabase
- * Version 1.0 - Cloud Integration
+ * Version 2.0 - Cloud Integration with Caching
  */
 
 import {
@@ -9,7 +9,7 @@ import {
   upsertSetting,
   fetchSettingsByCategory,
   deleteSetting
-} from '../../lib/supabaseData';
+} from '../../lib/cachedSupabaseData';
 
 // ============================================================================
 // GENERAL SETTINGS HELPERS
