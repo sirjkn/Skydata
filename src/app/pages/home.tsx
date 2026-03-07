@@ -461,13 +461,13 @@ export function Home() {
       </section>
 
       {/* Why Choose Skyway Suites */}
-      <section className="py-16 bg-[#FAF4EC]">
+      <section className="py-16 bg-[#36454F]">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-[#36454F] mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
               {homePageSettings?.whyUsTitle || 'Why Choose Skyway Suites?'}
             </h2>
-            <p className="text-gray-600 text-lg">
+            <p className="text-gray-300 text-lg">
               {homePageSettings?.whyUsSubtitle || 'Your trusted partner in finding the perfect home'}
             </p>
           </div>
