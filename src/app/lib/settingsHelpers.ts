@@ -70,6 +70,7 @@ export async function getHomePageSettings() {
       maxProperties: 6
     },
     whyUsTitle: 'Why Choose Skyway Suites',
+    whyUsSubtitle: 'Your trusted partner in finding the perfect home',
     whyUsItems: [
       { id: '1', icon: 'shield', title: 'Verified Properties', description: 'All properties are verified and inspected', order: 1 },
       { id: '2', icon: 'clock', title: '24/7 Support', description: 'Round the clock customer service', order: 2 },
@@ -78,6 +79,14 @@ export async function getHomePageSettings() {
       { id: '5', icon: 'heart', title: 'Quality Service', description: 'Exceptional hospitality standards', order: 5 },
       { id: '6', icon: 'check', title: 'Easy Booking', description: 'Simple and secure reservations', order: 6 }
     ],
+    getInTouch: {
+      title: 'Get In Touch',
+      subtitle: 'Have questions? We\'re here to help you find your dream home',
+      phone: '+254 700 123 456',
+      email: 'info@skywaysuites.co.ke',
+      address: 'Nairobi, Kenya',
+      whatsapp: '+254 700 123 456'
+    },
     footer: {
       aboutText: 'Skyway Suites is your premier destination for luxury property rentals in Kenya. We offer handpicked, verified properties for your perfect stay.',
       contactEmail: 'info@skywaysuites.co.ke',

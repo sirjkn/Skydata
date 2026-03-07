@@ -25,7 +25,7 @@ import {
   Clock,
   TrendingUp,
   Home,
-  Image,
+  Image as ImageIcon,
   Layout,
   Star,
   Grid3x3,
@@ -43,7 +43,11 @@ import {
   Wifi,
   WifiOff,
   Loader2,
-  HardDrive
+  HardDrive,
+  Heart,
+  Check,
+  Headset,
+  X
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -165,6 +169,7 @@ export function Settings() {
     },
     // Why Us Section
     whyUsTitle: 'Why Choose Skyway Suites',
+    whyUsSubtitle: 'Your trusted partner in finding the perfect home',
     whyUsItems: [
       { id: '1', icon: 'shield', title: 'Verified Properties', description: 'All properties are verified and inspected', order: 1 },
       { id: '2', icon: 'clock', title: '24/7 Support', description: 'Round the clock customer service', order: 2 },
@@ -173,6 +178,15 @@ export function Settings() {
       { id: '5', icon: 'heart', title: 'Quality Service', description: 'Exceptional hospitality standards', order: 5 },
       { id: '6', icon: 'check', title: 'Easy Booking', description: 'Simple and secure reservations', order: 6 }
     ],
+    // Get In Touch Section
+    getInTouch: {
+      title: 'Get In Touch',
+      subtitle: 'Have questions? We\'re here to help you find your dream home',
+      phone: '+254 700 123 456',
+      email: 'info@skywaysuites.co.ke',
+      address: 'Nairobi, Kenya',
+      whatsapp: '+254 700 123 456'
+    },
     // Footer
     footer: {
       aboutText: 'Skyway Suites is your premier destination for luxury property rentals in Kenya. We offer handpicked, verified properties for your perfect stay.',
@@ -197,6 +211,7 @@ export function Settings() {
   // Users States
   const [users, setUsers] = useState<any[]>([]);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [showManageRolesModal, setShowManageRolesModal] = useState(false);
   const [newUser, setNewUser] = useState({
     name: '',
@@ -254,6 +269,17 @@ export function Settings() {
 
         // Load homepage settings
         const homepageSettingsData = await settingsHelpers.getHomePageSettings();
+        // Ensure all required fields exist
+        if (!homepageSettingsData.getInTouch) {
+          homepageSettingsData.getInTouch = {
+            title: 'Get In Touch',
+            subtitle: 'Have questions? We\'re here to help you find your dream home',
+            phone: '+254 700 123 456',
+            email: 'info@skywaysuites.co.ke',
+            address: 'Nairobi, Kenya',
+            whatsapp: '+254 700 123 456'
+          };
+        }
         setHomePageSettings(homepageSettingsData);
 
         // Load customers (users)
@@ -369,6 +395,71 @@ export function Settings() {
     }
   };
 
+  // Helper function to compress image to WebP with max 50KB size
+  const compressImage = (file: File, maxSizeKB: number = 50): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          
+          // Start with reasonable dimensions (slideshow dimensions: 1920x600)
+          let width = 1920;
+          let height = 600;
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Could not get canvas context'));
+            return;
+          }
+          
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Try different quality levels to get under maxSizeKB
+          let quality = 0.9;
+          let result = canvas.toDataURL('image/webp', quality);
+          
+          while (result.length * 0.75 / 1024 > maxSizeKB && quality > 0.1) {
+            quality -= 0.1;
+            result = canvas.toDataURL('image/webp', quality);
+          }
+          
+          resolve(result);
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Handle image upload for slides
+  const handleSlideImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      showModal('error', 'File Too Large', 'Image must be less than 10MB');
+      return;
+    }
+
+    try {
+      const compressedImage = await compressImage(file, 50);
+      const compressedSizeKB = ((compressedImage.length * 0.75) / 1024).toFixed(1);
+      console.log(`✓ Compressed ${file.name} to ${compressedSizeKB}KB as WebP`);
+      
+      setEditingSlide({ ...editingSlide, image: compressedImage });
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      showModal('error', 'Error', 'Failed to process image. Please try again.');
+    }
+  };
+
   // Slide Management
   const handleAddSlide = () => {
     const newSlide = {
@@ -476,8 +567,8 @@ export function Settings() {
       return;
     }
 
-    if (!newUser.name || !newUser.email) {
-      showModal('error', 'Missing Information', 'Please provide name and email');
+    if (!newUser.name || !newUser.email || !newUser.password) {
+      showModal('error', 'Missing Information', 'Please provide name, email, and password');
       return;
     }
 
@@ -495,6 +586,35 @@ export function Settings() {
     } catch (error) {
       console.error('Error adding user:', error);
       showModal('error', 'Error', 'Failed to add user. Please try again.');
+    }
+  };
+
+  const handleEditUser = (user: any) => {
+    setEditingUser(user);
+    setShowEditUserModal(true);
+  };
+
+  const handleUpdateUser = async () => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot update user while offline. Please check your internet connection.');
+      return;
+    }
+
+    if (!editingUser?.name || !editingUser?.email) {
+      showModal('error', 'Missing Information', 'Please provide name and email');
+      return;
+    }
+
+    try {
+      const updatedUsers = users.map(u => u.id === editingUser.id ? editingUser : u);
+      setUsers(updatedUsers);
+      setShowEditUserModal(false);
+      setEditingUser(null);
+      await logActivity('User Updated', `User updated: ${editingUser.name}`);
+      showModal('success', 'User Updated', 'User information updated successfully!');
+    } catch (error) {
+      console.error('Error updating user:', error);
+      showModal('error', 'Error', 'Failed to update user. Please try again.');
     }
   };
 
@@ -1306,7 +1426,7 @@ export function Settings() {
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-[#6B7F39] flex items-center justify-center">
-                          <Image className="w-5 h-5 text-white" />
+                          <ImageIcon className="w-5 h-5 text-white" />
                         </div>
                         <div>
                           <h3 className="text-xl font-bold text-[#36454F]">Slideshow Management</h3>
@@ -1329,17 +1449,29 @@ export function Settings() {
                         key={slide.id}
                         className="group bg-[#FAF4EC] rounded-2xl p-5 border border-[#36454F]/10 hover:border-[#6B7F39] transition-all duration-300"
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-[#6B7F39] text-white font-bold flex items-center justify-center">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-4 flex-1">
+                            <div className="w-12 h-12 rounded-xl bg-[#6B7F39] text-white font-bold flex items-center justify-center flex-shrink-0">
                               {index + 1}
                             </div>
-                            <div>
-                              <p className="font-bold text-[#36454F] text-lg">{slide.title}</p>
-                              <p className="text-gray-600 text-sm">{slide.subtitle}</p>
+                            {slide.image && (
+                              <div className="w-24 h-16 rounded-lg overflow-hidden border-2 border-[#6B7F39] flex-shrink-0">
+                                <img 
+                                  src={slide.image} 
+                                  alt={slide.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-[#36454F] text-lg truncate">{slide.title}</p>
+                              <p className="text-gray-600 text-sm truncate">{slide.subtitle}</p>
+                              {!slide.image && (
+                                <p className="text-xs text-gray-400 mt-1">No image uploaded</p>
+                              )}
                             </div>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 flex-shrink-0">
                             <Button
                               variant="outline"
                               size="sm"
@@ -1364,6 +1496,317 @@ export function Settings() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                {/* Why Choose Skyway Suites Section */}
+                <div className="bg-white rounded-2xl shadow-lg border border-[#36454F]/10 overflow-hidden">
+                  <div className="p-6 bg-[#FAF4EC] border-b border-[#36454F]/10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#6B7F39] flex items-center justify-center">
+                        <Star className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-[#36454F]">Why Choose Skyway Suites</h3>
+                        <p className="text-sm text-[#36454F]/70">Section title and subtitle</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-[#36454F]">Section Title</label>
+                      <Input
+                        value={homePageSettings.whyUsTitle}
+                        onChange={(e) => setHomePageSettings({...homePageSettings, whyUsTitle: e.target.value})}
+                        className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-[#36454F]">Section Subtitle</label>
+                      <Input
+                        value={homePageSettings.whyUsSubtitle}
+                        onChange={(e) => setHomePageSettings({...homePageSettings, whyUsSubtitle: e.target.value})}
+                        className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                      />
+                    </div>
+                    <div className="border-t pt-4 mt-4">
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="font-semibold text-[#36454F]">Features ({homePageSettings.whyUsItems.length})</h4>
+                        <Button
+                          onClick={handleAddWhyUsItem}
+                          size="sm"
+                          className="bg-[#6B7F39] hover:bg-[#5a6930] text-white"
+                          disabled={!isOnline}
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Feature
+                        </Button>
+                      </div>
+                      <div className="space-y-3">
+                        {homePageSettings.whyUsItems.map((item, index) => (
+                          <div
+                            key={item.id}
+                            className="bg-[#FAF4EC] rounded-xl p-4 border border-[#36454F]/10"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3 flex-1">
+                                <div className="w-10 h-10 rounded-lg bg-[#6B7F39] text-white font-bold flex items-center justify-center text-sm">
+                                  {index + 1}
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-bold text-[#36454F]">{item.title}</p>
+                                  <p className="text-sm text-gray-600 line-clamp-1">{item.description}</p>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditWhyUsItem(item)}
+                                  className="border-2 border-[#6B7F39] text-[#6B7F39] hover:bg-[#FAF4EC]"
+                                  disabled={!isOnline}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteWhyUsItem(item.id)}
+                                  className="border-2 border-[#36454F] text-[#36454F] hover:bg-[#FAF4EC]"
+                                  disabled={!isOnline}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Get In Touch Section */}
+                <div className="bg-white rounded-2xl shadow-lg border border-[#36454F]/10 overflow-hidden">
+                  <div className="p-6 bg-[#FAF4EC] border-b border-[#36454F]/10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#6B7F39] flex items-center justify-center">
+                        <Headset className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-[#36454F]">Get In Touch</h3>
+                        <p className="text-sm text-[#36454F]/70">Contact section settings</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2 col-span-2">
+                        <label className="text-sm font-semibold text-[#36454F]">Section Title</label>
+                        <Input
+                          value={homePageSettings?.getInTouch?.title || ''}
+                          onChange={(e) => setHomePageSettings({
+                            ...homePageSettings,
+                            getInTouch: {...(homePageSettings?.getInTouch || {}), title: e.target.value}
+                          })}
+                          className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                        />
+                      </div>
+                      <div className="space-y-2 col-span-2">
+                        <label className="text-sm font-semibold text-[#36454F]">Section Subtitle</label>
+                        <Input
+                          value={homePageSettings?.getInTouch?.subtitle || ''}
+                          onChange={(e) => setHomePageSettings({
+                            ...homePageSettings,
+                            getInTouch: {...(homePageSettings?.getInTouch || {}), subtitle: e.target.value}
+                          })}
+                          className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-[#36454F]">Phone</label>
+                        <Input
+                          value={homePageSettings?.getInTouch?.phone || ''}
+                          onChange={(e) => setHomePageSettings({
+                            ...homePageSettings,
+                            getInTouch: {...(homePageSettings?.getInTouch || {}), phone: e.target.value}
+                          })}
+                          className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-[#36454F]">Email</label>
+                        <Input
+                          value={homePageSettings?.getInTouch?.email || ''}
+                          onChange={(e) => setHomePageSettings({
+                            ...homePageSettings,
+                            getInTouch: {...(homePageSettings?.getInTouch || {}), email: e.target.value}
+                          })}
+                          className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-[#36454F]">WhatsApp</label>
+                        <Input
+                          value={homePageSettings?.getInTouch?.whatsapp || ''}
+                          onChange={(e) => setHomePageSettings({
+                            ...homePageSettings,
+                            getInTouch: {...(homePageSettings?.getInTouch || {}), whatsapp: e.target.value}
+                          })}
+                          className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-[#36454F]">Address</label>
+                        <Input
+                          value={homePageSettings?.getInTouch?.address || ''}
+                          onChange={(e) => setHomePageSettings({
+                            ...homePageSettings,
+                            getInTouch: {...(homePageSettings?.getInTouch || {}), address: e.target.value}
+                          })}
+                          className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Section */}
+                <div className="bg-white rounded-2xl shadow-lg border border-[#36454F]/10 overflow-hidden">
+                  <div className="p-6 bg-[#FAF4EC] border-b border-[#36454F]/10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#6B7F39] flex items-center justify-center">
+                        <Layout className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-[#36454F]">Footer</h3>
+                        <p className="text-sm text-[#36454F]/70">Footer content and links</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-[#36454F]">About Text</label>
+                      <Textarea
+                        value={homePageSettings.footer.aboutText}
+                        onChange={(e) => setHomePageSettings({
+                          ...homePageSettings,
+                          footer: {...homePageSettings.footer, aboutText: e.target.value}
+                        })}
+                        className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl min-h-[100px]"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-[#36454F]">Contact Email</label>
+                        <Input
+                          value={homePageSettings.footer.contactEmail}
+                          onChange={(e) => setHomePageSettings({
+                            ...homePageSettings,
+                            footer: {...homePageSettings.footer, contactEmail: e.target.value}
+                          })}
+                          className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-[#36454F]">Contact Phone</label>
+                        <Input
+                          value={homePageSettings.footer.contactPhone}
+                          onChange={(e) => setHomePageSettings({
+                            ...homePageSettings,
+                            footer: {...homePageSettings.footer, contactPhone: e.target.value}
+                          })}
+                          className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                        />
+                      </div>
+                      <div className="space-y-2 col-span-2">
+                        <label className="text-sm font-semibold text-[#36454F]">Contact Address</label>
+                        <Input
+                          value={homePageSettings.footer.contactAddress}
+                          onChange={(e) => setHomePageSettings({
+                            ...homePageSettings,
+                            footer: {...homePageSettings.footer, contactAddress: e.target.value}
+                          })}
+                          className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                        />
+                      </div>
+                    </div>
+                    <div className="border-t pt-4">
+                      <h4 className="font-semibold text-[#36454F] mb-3">Social Media Links</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-[#36454F]">Facebook</label>
+                          <Input
+                            value={homePageSettings.footer.socialLinks.facebook}
+                            onChange={(e) => setHomePageSettings({
+                              ...homePageSettings,
+                              footer: {
+                                ...homePageSettings.footer,
+                                socialLinks: {...homePageSettings.footer.socialLinks, facebook: e.target.value}
+                              }
+                            })}
+                            className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                            placeholder="https://facebook.com/..."
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-[#36454F]">Twitter</label>
+                          <Input
+                            value={homePageSettings.footer.socialLinks.twitter}
+                            onChange={(e) => setHomePageSettings({
+                              ...homePageSettings,
+                              footer: {
+                                ...homePageSettings.footer,
+                                socialLinks: {...homePageSettings.footer.socialLinks, twitter: e.target.value}
+                              }
+                            })}
+                            className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                            placeholder="https://twitter.com/..."
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-[#36454F]">Instagram</label>
+                          <Input
+                            value={homePageSettings.footer.socialLinks.instagram}
+                            onChange={(e) => setHomePageSettings({
+                              ...homePageSettings,
+                              footer: {
+                                ...homePageSettings.footer,
+                                socialLinks: {...homePageSettings.footer.socialLinks, instagram: e.target.value}
+                              }
+                            })}
+                            className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                            placeholder="https://instagram.com/..."
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-[#36454F]">LinkedIn</label>
+                          <Input
+                            value={homePageSettings.footer.socialLinks.linkedin}
+                            onChange={(e) => setHomePageSettings({
+                              ...homePageSettings,
+                              footer: {
+                                ...homePageSettings.footer,
+                                socialLinks: {...homePageSettings.footer.socialLinks, linkedin: e.target.value}
+                              }
+                            })}
+                            className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                            placeholder="https://linkedin.com/..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-[#36454F]">Copyright Text</label>
+                      <Input
+                        value={homePageSettings.footer.copyrightText}
+                        onChange={(e) => setHomePageSettings({
+                          ...homePageSettings,
+                          footer: {...homePageSettings.footer, copyrightText: e.target.value}
+                        })}
+                        className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1437,6 +1880,16 @@ export function Settings() {
                               <span className="px-3 py-1 bg-[#6B7F39] text-white text-xs font-semibold rounded-full">
                                 {user.role}
                               </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditUser(user)}
+                                className="border-2 border-[#6B7F39] text-[#6B7F39] hover:bg-[#FAF4EC]"
+                                disabled={!isOnline}
+                              >
+                                <Edit className="w-4 h-4 mr-1" />
+                                Edit
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1814,8 +2267,8 @@ export function Settings() {
       {/* Slide Modal */}
       {showSlideModal && editingSlide && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
-            <div className="p-6 bg-[#6B7F39] rounded-t-2xl">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 bg-[#6B7F39] rounded-t-2xl sticky top-0 z-10">
               <h3 className="text-xl font-bold text-white">
                 {homePageSettings.slides.find(s => s.id === editingSlide.id) ? 'Edit Slide' : 'Add Slide'}
               </h3>
@@ -1827,6 +2280,7 @@ export function Settings() {
                   value={editingSlide.title}
                   onChange={(e) => setEditingSlide({...editingSlide, title: e.target.value})}
                   className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                  placeholder="Enter slide title"
                 />
               </div>
               <div className="space-y-2">
@@ -1835,7 +2289,46 @@ export function Settings() {
                   value={editingSlide.subtitle}
                   onChange={(e) => setEditingSlide({...editingSlide, subtitle: e.target.value})}
                   className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                  placeholder="Enter slide subtitle"
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-[#36454F]">
+                  Image (1920x600 recommended)
+                </label>
+                <div className="space-y-3">
+                  <label htmlFor="slide-image-upload" className="cursor-pointer">
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-[#6B7F39] transition-colors">
+                      <div className="flex flex-col items-center gap-2">
+                        <Upload className="w-8 h-8 text-gray-400" />
+                        <p className="text-sm text-gray-600">Click to upload image</p>
+                        <p className="text-xs text-gray-500">Max 10MB, will be compressed to WebP (50KB)</p>
+                      </div>
+                    </div>
+                    <input
+                      id="slide-image-upload"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleSlideImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  {editingSlide.image && (
+                    <div className="relative rounded-xl overflow-hidden border-2 border-[#6B7F39]">
+                      <img 
+                        src={editingSlide.image} 
+                        alt="Slide preview" 
+                        className="w-full h-32 object-cover"
+                      />
+                      <button
+                        onClick={() => setEditingSlide({...editingSlide, image: ''})}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div className="p-6 pt-0 flex gap-3 justify-end">
@@ -1863,26 +2356,28 @@ export function Settings() {
       {/* Add User Modal */}
       {showAddUserModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
-            <div className="p-6 bg-[#6B7F39] rounded-t-2xl">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 bg-[#6B7F39] rounded-t-2xl sticky top-0 z-10">
               <h3 className="text-xl font-bold text-white">Add New User</h3>
             </div>
             <div className="p-6 space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-[#36454F]">Name</label>
+                <label className="text-sm font-semibold text-[#36454F]">Name *</label>
                 <Input
                   value={newUser.name}
                   onChange={(e) => setNewUser({...newUser, name: e.target.value})}
                   className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                  placeholder="Enter full name"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-[#36454F]">Email</label>
+                <label className="text-sm font-semibold text-[#36454F]">Email *</label>
                 <Input
                   type="email"
                   value={newUser.email}
                   onChange={(e) => setNewUser({...newUser, email: e.target.value})}
                   className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                  placeholder="user@example.com"
                 />
               </div>
               <div className="space-y-2">
@@ -1891,10 +2386,21 @@ export function Settings() {
                   value={newUser.phone}
                   onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
                   className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                  placeholder="+254 700 000 000"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-[#36454F]">Role</label>
+                <label className="text-sm font-semibold text-[#36454F]">Password *</label>
+                <Input
+                  type="password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                  className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                  placeholder="Enter password"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-[#36454F]">Role *</label>
                 <Select
                   value={newUser.role}
                   onValueChange={(value) => setNewUser({...newUser, role: value})}
@@ -1926,6 +2432,163 @@ export function Settings() {
                 className="bg-[#6B7F39] hover:bg-[#5a6930] text-white"
               >
                 Add User
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {showEditUserModal && editingUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 bg-[#6B7F39] rounded-t-2xl sticky top-0 z-10">
+              <h3 className="text-xl font-bold text-white">Edit User</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-[#36454F]">Name *</label>
+                <Input
+                  value={editingUser.name}
+                  onChange={(e) => setEditingUser({...editingUser, name: e.target.value})}
+                  className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                  placeholder="Enter full name"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-[#36454F]">Email *</label>
+                <Input
+                  type="email"
+                  value={editingUser.email}
+                  onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
+                  className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                  placeholder="user@example.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-[#36454F]">Phone</label>
+                <Input
+                  value={editingUser.phone}
+                  onChange={(e) => setEditingUser({...editingUser, phone: e.target.value})}
+                  className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                  placeholder="+254 700 000 000"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-[#36454F]">
+                  Password (leave empty to keep current)
+                </label>
+                <Input
+                  type="password"
+                  value={editingUser.password || ''}
+                  onChange={(e) => setEditingUser({...editingUser, password: e.target.value})}
+                  className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                  placeholder="Enter new password"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-[#36454F]">Role *</label>
+                <Select
+                  value={editingUser.role}
+                  onValueChange={(value) => setEditingUser({...editingUser, role: value})}
+                >
+                  <SelectTrigger className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Admin">Admin</SelectItem>
+                    <SelectItem value="Manager">Manager</SelectItem>
+                    <SelectItem value="Customer">Customer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="p-6 pt-0 flex gap-3 justify-end">
+              <Button
+                onClick={() => {
+                  setShowEditUserModal(false);
+                  setEditingUser(null);
+                }}
+                variant="outline"
+                className="border-2 border-[#36454F] text-[#36454F] hover:bg-[#FAF4EC]"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdateUser}
+                className="bg-[#6B7F39] hover:bg-[#5a6930] text-white"
+              >
+                Update User
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Why Us Item Modal */}
+      {showWhyUsModal && editingWhyUsItem && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 bg-[#6B7F39] rounded-t-2xl sticky top-0 z-10">
+              <h3 className="text-xl font-bold text-white">
+                {homePageSettings.whyUsItems.find(i => i.id === editingWhyUsItem.id) ? 'Edit Feature' : 'Add Feature'}
+              </h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-[#36454F]">Icon</label>
+                <Select
+                  value={editingWhyUsItem.icon}
+                  onValueChange={(value) => setEditingWhyUsItem({...editingWhyUsItem, icon: value})}
+                >
+                  <SelectTrigger className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="shield">Shield (Verified)</SelectItem>
+                    <SelectItem value="clock">Clock (24/7 Support)</SelectItem>
+                    <SelectItem value="star">Star (Best Quality)</SelectItem>
+                    <SelectItem value="map">Map Pin (Locations)</SelectItem>
+                    <SelectItem value="heart">Heart (Quality Service)</SelectItem>
+                    <SelectItem value="check">Check (Easy Booking)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-[#36454F]">Title</label>
+                <Input
+                  value={editingWhyUsItem.title}
+                  onChange={(e) => setEditingWhyUsItem({...editingWhyUsItem, title: e.target.value})}
+                  className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                  placeholder="Enter feature title"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-[#36454F]">Description</label>
+                <Textarea
+                  value={editingWhyUsItem.description}
+                  onChange={(e) => setEditingWhyUsItem({...editingWhyUsItem, description: e.target.value})}
+                  className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl min-h-[100px]"
+                  placeholder="Enter feature description"
+                />
+              </div>
+            </div>
+            <div className="p-6 pt-0 flex gap-3 justify-end">
+              <Button
+                onClick={() => {
+                  setShowWhyUsModal(false);
+                  setEditingWhyUsItem(null);
+                }}
+                variant="outline"
+                className="border-2 border-[#36454F] text-[#36454F] hover:bg-[#FAF4EC]"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveWhyUsItem}
+                className="bg-[#6B7F39] hover:bg-[#5a6930] text-white"
+              >
+                Save
               </Button>
             </div>
           </div>

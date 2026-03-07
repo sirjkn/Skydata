@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { fetchProperties, fetchBookings } from '../../lib/supabaseData';
+import { getHomePageSettings, getGeneralSettings } from '../lib/settingsHelpers';
 import { ConnectionStatusBanner } from '../components/connection-status';
 import Slider from 'react-slick';
 import { 
@@ -110,12 +111,72 @@ export function Home() {
   const [properties, setProperties] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [homePageSettings, setHomePageSettings] = useState<any>(null);
+  const [generalSettings, setGeneralSettings] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     message: ''
   });
+
+  // Map icon names to icon components
+  const iconMap: Record<string, any> = {
+    shield: Shield,
+    clock: Clock,
+    heart: Heart,
+    trendingup: TrendingUp,
+    users: Users,
+    headset: Headset,
+    star: Heart, // fallback
+    map: MapPin,
+    check: Heart // fallback
+  };
+
+  const getIcon = (iconNameOrComponent: any) => {
+    // If it's already a component (function), return it
+    if (typeof iconNameOrComponent === 'function') {
+      return iconNameOrComponent;
+    }
+    // If it's a string, map it to the component
+    if (typeof iconNameOrComponent === 'string' && iconNameOrComponent) {
+      try {
+        const key = String(iconNameOrComponent).toLowerCase().trim();
+        return iconMap[key] || Heart;
+      } catch (err) {
+        console.error('Error converting icon name:', err);
+        return Heart;
+      }
+    }
+    // Default fallback
+    return Heart;
+  };
+
+  // Load homepage settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await getHomePageSettings();
+        setHomePageSettings(settings);
+      } catch (error) {
+        console.error('Failed to load homepage settings:', error);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  // Load general settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await getGeneralSettings();
+        setGeneralSettings(settings);
+      } catch (error) {
+        console.error('Failed to load general settings:', error);
+      }
+    };
+    loadSettings();
+  }, []);
 
   // Load properties and bookings from Supabase
   useEffect(() => {
@@ -204,8 +265,8 @@ export function Home() {
       {/* Hero Slider */}
       <section className="relative">
         <Slider {...heroSettings}>
-          {heroSlides.map((slide, index) => (
-            <div key={index} className="relative">
+          {(homePageSettings?.slides || []).filter((slide: any) => slide.image).map((slide: any, index: number) => (
+            <div key={slide.id || index} className="relative">
               <div className="relative h-[350px] md:h-[450px]">
                 <img
                   src={slide.image}
@@ -238,14 +299,14 @@ export function Home() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-[#36454F] mb-4">
-              Featured Properties
+              {homePageSettings?.propertiesTitle || 'Featured Properties'}
             </h2>
             <p className="text-gray-600 text-lg">
-              Handpicked premium properties just for you
+              {homePageSettings?.propertiesSubtitle || 'Handpicked premium properties just for you'}
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {isLoading ? (
               <div className="col-span-full text-center py-16 relative">
                 <div className="absolute inset-0 backdrop-blur-sm bg-white/30 rounded-lg"></div>
@@ -404,18 +465,21 @@ export function Home() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-[#36454F] mb-4">
-              Why Choose Skyway Suites?
+              {homePageSettings?.whyUsTitle || 'Why Choose Skyway Suites?'}
             </h2>
             <p className="text-gray-600 text-lg">
-              Your trusted partner in finding the perfect home
+              {homePageSettings?.whyUsSubtitle || 'Your trusted partner in finding the perfect home'}
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {whyChooseUs.map((item, index) => {
-              const Icon = item.icon;
+            {(homePageSettings?.whyUsItems && homePageSettings.whyUsItems.length > 0 
+              ? homePageSettings.whyUsItems 
+              : whyChooseUs
+            ).map((item: any, index: number) => {
+              const Icon = getIcon(item.icon);
               return (
-                <Card key={index} className="bg-white hover:shadow-lg transition-shadow duration-300">
+                <Card key={item.id || index} className="bg-white hover:shadow-lg transition-shadow duration-300">
                   <CardContent className="p-6 text-center">
                     <div className="inline-flex items-center justify-center w-16 h-16 bg-[#6B7F39] rounded-full mb-4">
                       <Icon className="w-8 h-8 text-white" />
@@ -440,10 +504,10 @@ export function Home() {
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-[#36454F] mb-4">
-                Get In Touch
+                {homePageSettings?.getInTouch?.title || 'Get In Touch'}
               </h2>
               <p className="text-gray-600 text-lg">
-                Have questions? We're here to help you find your dream home
+                {homePageSettings?.getInTouch?.subtitle || "Have questions? We're here to help you find your dream home"}
               </p>
             </div>
 
@@ -458,8 +522,7 @@ export function Home() {
                       </div>
                       <div>
                         <h4 className="font-semibold text-[#36454F] mb-1">Phone</h4>
-                        <p className="text-gray-600">+254 700 123 456</p>
-                        <p className="text-gray-600">+254 733 987 654</p>
+                        <p className="text-gray-600">{generalSettings?.companyPhone || '+254 700 123 456'}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -473,8 +536,7 @@ export function Home() {
                       </div>
                       <div>
                         <h4 className="font-semibold text-[#36454F] mb-1">Email</h4>
-                        <p className="text-gray-600">info@skywaysuites.co.ke</p>
-                        <p className="text-gray-600">support@skywaysuites.co.ke</p>
+                        <p className="text-gray-600">{generalSettings?.companyEmail || 'info@skywaysuites.co.ke'}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -492,6 +554,10 @@ export function Home() {
                         <Button 
                           variant="link" 
                           className="text-[#25D366] p-0 h-auto font-semibold"
+                          onClick={() => {
+                            const phone = (generalSettings?.companyPhone || '+254 700 123 456').replace(/\s+/g, '');
+                            window.open(`https://wa.me/${phone}`, '_blank');
+                          }}
                         >
                           Start Chat →
                         </Button>
