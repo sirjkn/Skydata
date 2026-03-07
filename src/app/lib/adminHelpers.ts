@@ -4,6 +4,7 @@
  * Version 1.0
  */
 
+import { getCurrentUser } from './auth';
 import {
   fetchCategories,
   fetchFeatures,
@@ -222,16 +223,17 @@ export async function removeBooking(bookingId: number) {
 // ============================================================================
 
 export async function addPayment(paymentData: any) {
+  // Get current user for created_by field
+  const currentUser = getCurrentUser();
+  
   const newPaymentData = {
     booking_id: paymentData.bookingId,
-    customer_id: paymentData.customerId,
-    property_id: paymentData.propertyId,
     payment_date: paymentData.date,
     amount: paymentData.paidAmount,
     payment_method: paymentData.paymentMode,
     payment_reference: paymentData.transactionId,
-    mpesa_code: paymentData.mpesaCode || '',
-    notes: paymentData.notes || ''
+    notes: paymentData.notes || '',
+    created_by: currentUser?.id ? parseInt(currentUser.id) : null
   };
 
   const createdPayment = await createPayment(newPaymentData);

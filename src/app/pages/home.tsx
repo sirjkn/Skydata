@@ -109,6 +109,7 @@ export function Home() {
   const navigate = useNavigate();
   const [properties, setProperties] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -119,6 +120,7 @@ export function Home() {
   // Load properties and bookings from Supabase
   useEffect(() => {
     const loadData = async () => {
+      setIsLoading(true);
       try {
         const [loadedProperties, loadedBookings] = await Promise.all([
           fetchProperties(),
@@ -157,6 +159,8 @@ export function Home() {
         console.error('Failed to load data:', error);
         setProperties([]);
         setBookings([]);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -242,7 +246,16 @@ export function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {properties.length > 0 ? (
+            {isLoading ? (
+              <div className="col-span-full text-center py-16 relative">
+                <div className="absolute inset-0 backdrop-blur-sm bg-white/30 rounded-lg"></div>
+                <div className="relative z-10">
+                  <div className="w-16 h-16 mx-auto mb-4 border-4 border-[#6B7F39] border-t-transparent rounded-full animate-spin"></div>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">Loading Properties</h3>
+                  <p className="text-gray-600">Please wait while we fetch available properties...</p>
+                </div>
+              </div>
+            ) : properties.length > 0 ? (
               properties
                 .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
                 .slice(0, 8)
@@ -282,48 +295,87 @@ export function Home() {
                   }
                   
                   return (
-                    <Card key={property.id} className="overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                    <Card key={property.id} className="group overflow-hidden hover:shadow-2xl transition-all duration-300 border border-gray-200 hover:border-[#6B7F39]">
                       <div 
-                        className="relative h-48 cursor-pointer bg-gray-200" 
+                        className="relative h-56 cursor-pointer bg-gray-200 overflow-hidden" 
                         onClick={() => navigate(`/property/${property.id}`)}
                       >
                         {firstPhoto ? (
                           <img
                             src={firstPhoto}
                             alt={property.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-gray-300">
                             <HomeIcon className="w-16 h-16 text-gray-400" />
                           </div>
                         )}
-                        <div className="absolute top-3 right-3 bg-[#D4C5B0] text-[#36454F] px-2 py-1 rounded-lg text-xs font-semibold border border-[#B8A586]">
+                        {/* Price Badge */}
+                        <div className="absolute top-3 right-3 bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-lg">
                           KSh {property.price.toLocaleString()}/day
                         </div>
+                        {/* Status Badge */}
                         {isBooked && (
-                          <div className="absolute top-3 left-3 bg-orange-500 text-white px-2 py-1 rounded-lg text-xs font-semibold">
+                          <div className="absolute top-3 left-3 bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg">
                             Booked
                           </div>
                         )}
+                        {/* Overlay gradient */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                       </div>
-                      <CardContent className="p-4">
+                      <CardContent className="p-5 space-y-3">
+                        {/* Title */}
                         <h3 
-                          className="font-bold text-[#36454F] text-lg mb-2 cursor-pointer hover:text-[#6B7F39] transition line-clamp-1"
+                          className="font-bold text-[#36454F] text-lg cursor-pointer group-hover:text-[#6B7F39] transition line-clamp-1"
                           onClick={() => navigate(`/property/${property.id}`)}
                         >
                           {property.name}
                         </h3>
-                        <div className="flex items-center text-gray-600 text-sm mb-3">
-                          <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
+                        
+                        {/* Location */}
+                        <div className="flex items-center text-gray-600 text-sm">
+                          <MapPin className="w-4 h-4 mr-1.5 flex-shrink-0 text-[#6B7F39]" />
                           <span className="line-clamp-1">{property.location}</span>
                         </div>
-                        <div className="flex flex-col gap-2 mb-3">
-                          <span className="text-xs px-2 py-1 bg-[#FAF4EC] rounded-full text-gray-700 text-center">
-                            {property.category}
-                          </span>
+
+                        {/* Property Info Grid */}
+                        <div className="grid grid-cols-3 gap-2 pt-2 pb-3 border-t border-b border-gray-100">
+                          <div className="flex flex-col items-center">
+                            <Bed className="w-4 h-4 text-[#6B7F39] mb-1" />
+                            <span className="text-xs font-semibold text-gray-700">{property.beds} Beds</span>
+                          </div>
+                          <div className="flex flex-col items-center border-l border-r border-gray-100">
+                            <Bath className="w-4 h-4 text-[#6B7F39] mb-1" />
+                            <span className="text-xs font-semibold text-gray-700">{property.baths} Baths</span>
+                          </div>
+                          <div className="flex flex-col items-center">
+                            <Maximize className="w-4 h-4 text-[#6B7F39] mb-1" />
+                            <span className="text-xs font-semibold text-gray-700">{property.area || 'N/A'} sqft</span>
+                          </div>
                         </div>
-                        <Button className="w-full bg-[#36454F] hover:bg-[#2a3740]" onClick={() => navigate(`/property/${property.id}`)}>
+
+                        {/* Features */}
+                        {property.features && property.features.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {property.features.slice(0, 3).map((feature: string, idx: number) => (
+                              <span key={idx} className="text-xs px-2 py-1 bg-[#FAF4EC] rounded-full text-gray-700">
+                                {feature}
+                              </span>
+                            ))}
+                            {property.features.length > 3 && (
+                              <span className="text-xs px-2 py-1 bg-gray-100 rounded-full text-gray-600">
+                                +{property.features.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Button */}
+                        <Button 
+                          className="w-full bg-[#36454F] hover:bg-[#6B7F39] text-white transition-colors duration-300" 
+                          onClick={() => navigate(`/property/${property.id}`)}
+                        >
                           View Details
                         </Button>
                       </CardContent>

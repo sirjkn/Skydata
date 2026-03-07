@@ -22,11 +22,17 @@ import { Header } from '../components/header';
 import { RichTextEditor } from '../components/rich-text-editor';
 import { getCurrentUser } from '../lib/auth';
 import { CustomModal } from '../components/custom-modal';
+import { 
+  fetchMenuPages, 
+  createMenuPage, 
+  updateMenuPage, 
+  deleteMenuPage 
+} from '../../lib/supabaseData';
 
 type MenuItemType = 'custom' | 'internal' | 'external';
 
 interface MenuItem {
-  id: string;
+  id: number;
   type: MenuItemType;
   title: string;
   url?: string;
@@ -43,6 +49,7 @@ export function MenuPagesManager() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [activeModal, setActiveModal] = useState<'create' | 'link' | 'external' | null>(null);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Form states for Create Page
   const [createPageForm, setCreatePageForm] = useState({
@@ -121,11 +128,53 @@ export function MenuPagesManager() {
 
   // Load menu items
   useEffect(() => {
-    const savedMenuItems = localStorage.getItem('skyway_menu_items');
-    if (savedMenuItems) {
-      setMenuItems(JSON.parse(savedMenuItems));
-    }
+    const loadMenuItems = async () => {
+      try {
+        const pages = await fetchMenuPages();
+        // Convert Supabase format to local format
+        const items = pages.map(page => ({
+          id: page.page_id,
+          type: (page.page_slug.startsWith('/') ? 'internal' : 'custom') as MenuItemType,
+          title: page.page_name,
+          url: page.page_slug.startsWith('/') ? page.page_slug : undefined,
+          slug: !page.page_slug.startsWith('/') ? page.page_slug : undefined,
+          content: page.page_content || '',
+          showInMenu: page.is_published,
+          order: page.display_order,
+          createdAt: page.created_at
+        }));
+        setMenuItems(items);
+      } catch (error) {
+        console.error('Failed to load menu pages:', error);
+        setMenuItems([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadMenuItems();
   }, []);
+
+  // Reload menu items and trigger header update
+  const reloadMenuItems = async () => {
+    try {
+      const pages = await fetchMenuPages();
+      const items = pages.map(page => ({
+        id: page.page_id,
+        type: (page.page_slug.startsWith('/') ? 'internal' : 'custom') as MenuItemType,
+        title: page.page_name,
+        url: page.page_slug.startsWith('/') ? page.page_slug : undefined,
+        slug: !page.page_slug.startsWith('/') ? page.page_slug : undefined,
+        content: page.page_content || '',
+        showInMenu: page.is_published,
+        order: page.display_order,
+        createdAt: page.created_at
+      }));
+      setMenuItems(items);
+      window.dispatchEvent(new Event('menuItemsUpdated'));
+    } catch (error) {
+      console.error('Failed to reload menu pages:', error);
+    }
+  };
 
   // Save menu items
   const saveMenuItems = (items: MenuItem[]) => {
@@ -144,7 +193,7 @@ export function MenuPagesManager() {
   };
 
   // Handle Create Page
-  const handleCreatePage = (e: React.FormEvent) => {
+  const handleCreatePage = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const slug = createPageForm.slug || generateSlug(createPageForm.title);
@@ -156,7 +205,7 @@ export function MenuPagesManager() {
     }
 
     const newItem: MenuItem = {
-      id: Date.now().toString(),
+      id: Date.now(),
       type: 'custom',
       title: createPageForm.title,
       slug: slug,
@@ -166,18 +215,23 @@ export function MenuPagesManager() {
       createdAt: new Date().toISOString()
     };
 
-    saveMenuItems([...menuItems, newItem]);
-    setCreatePageForm({ title: '', slug: '', content: '' });
-    setActiveModal(null);
-    showModal('success', 'Success', 'Page created successfully!');
+    const createdItem = await createMenuPage(newItem);
+    if (createdItem) {
+      setMenuItems([...menuItems, createdItem]);
+      setCreatePageForm({ title: '', slug: '', content: '' });
+      setActiveModal(null);
+      showModal('success', 'Success', 'Page created successfully!');
+    } else {
+      showModal('error', 'Error', 'Failed to create page!');
+    }
   };
 
   // Handle Link Internal Page
-  const handleLinkPage = (e: React.FormEvent) => {
+  const handleLinkPage = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const newItem: MenuItem = {
-      id: Date.now().toString(),
+      id: Date.now(),
       type: 'internal',
       title: linkPageForm.title,
       url: linkPageForm.url,
@@ -186,18 +240,23 @@ export function MenuPagesManager() {
       createdAt: new Date().toISOString()
     };
 
-    saveMenuItems([...menuItems, newItem]);
-    setLinkPageForm({ title: '', url: '/' });
-    setActiveModal(null);
-    showModal('success', 'Success', 'Internal link added successfully!');
+    const createdItem = await createMenuPage(newItem);
+    if (createdItem) {
+      setMenuItems([...menuItems, createdItem]);
+      setLinkPageForm({ title: '', url: '/' });
+      setActiveModal(null);
+      showModal('success', 'Success', 'Internal link added successfully!');
+    } else {
+      showModal('error', 'Error', 'Failed to add internal link!');
+    }
   };
 
   // Handle Add External Link
-  const handleAddExternal = (e: React.FormEvent) => {
+  const handleAddExternal = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const newItem: MenuItem = {
-      id: Date.now().toString(),
+      id: Date.now(),
       type: 'external',
       title: externalLinkForm.title,
       url: externalLinkForm.url,
@@ -206,14 +265,19 @@ export function MenuPagesManager() {
       createdAt: new Date().toISOString()
     };
 
-    saveMenuItems([...menuItems, newItem]);
-    setExternalLinkForm({ title: '', url: 'https://' });
-    setActiveModal(null);
-    showModal('success', 'Success', 'External link added successfully!');
+    const createdItem = await createMenuPage(newItem);
+    if (createdItem) {
+      setMenuItems([...menuItems, createdItem]);
+      setExternalLinkForm({ title: '', url: 'https://' });
+      setActiveModal(null);
+      showModal('success', 'Success', 'External link added successfully!');
+    } else {
+      showModal('error', 'Error', 'Failed to add external link!');
+    }
   };
 
   // Toggle visibility
-  const toggleVisibility = (id: string) => {
+  const toggleVisibility = (id: number) => {
     const updatedItems = menuItems.map(item =>
       item.id === id ? { ...item, showInMenu: !item.showInMenu } : item
     );
@@ -221,13 +285,14 @@ export function MenuPagesManager() {
   };
 
   // Delete item
-  const handleDelete = (id: string) => {
+  const handleDelete = (id: number) => {
     showModal(
       'confirm',
       'Confirm Delete',
       'Are you sure you want to delete this menu item?',
       () => {
         const updatedItems = menuItems.filter(item => item.id !== id);
+        deleteMenuPage(id);
         saveMenuItems(updatedItems);
       }
     );
@@ -259,7 +324,7 @@ export function MenuPagesManager() {
   };
 
   // Update existing item
-  const handleUpdatePage = (e: React.FormEvent) => {
+  const handleUpdatePage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
 
@@ -286,14 +351,24 @@ export function MenuPagesManager() {
         : item
     );
 
-    saveMenuItems(updatedItems);
-    setCreatePageForm({ title: '', slug: '', content: '' });
-    setEditingItem(null);
-    setActiveModal(null);
-    showModal('success', 'Success', 'Page updated successfully!');
+    const updatedItem = await updateMenuPage(editingItem.id, {
+      title: createPageForm.title,
+      slug: slug,
+      content: createPageForm.content
+    });
+
+    if (updatedItem) {
+      saveMenuItems(updatedItems);
+      setCreatePageForm({ title: '', slug: '', content: '' });
+      setEditingItem(null);
+      setActiveModal(null);
+      showModal('success', 'Success', 'Page updated successfully!');
+    } else {
+      showModal('error', 'Error', 'Failed to update page!');
+    }
   };
 
-  const handleUpdateLink = (e: React.FormEvent) => {
+  const handleUpdateLink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
 
@@ -307,14 +382,23 @@ export function MenuPagesManager() {
         : item
     );
 
-    saveMenuItems(updatedItems);
-    setLinkPageForm({ title: '', url: '/' });
-    setEditingItem(null);
-    setActiveModal(null);
-    showModal('success', 'Success', 'Link updated successfully!');
+    const updatedItem = await updateMenuPage(editingItem.id, {
+      title: linkPageForm.title,
+      url: linkPageForm.url
+    });
+
+    if (updatedItem) {
+      saveMenuItems(updatedItems);
+      setLinkPageForm({ title: '', url: '/' });
+      setEditingItem(null);
+      setActiveModal(null);
+      showModal('success', 'Success', 'Link updated successfully!');
+    } else {
+      showModal('error', 'Error', 'Failed to update link!');
+    }
   };
 
-  const handleUpdateExternal = (e: React.FormEvent) => {
+  const handleUpdateExternal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
 
@@ -328,11 +412,20 @@ export function MenuPagesManager() {
         : item
     );
 
-    saveMenuItems(updatedItems);
-    setExternalLinkForm({ title: '', url: 'https://' });
-    setEditingItem(null);
-    setActiveModal(null);
-    showModal('success', 'Success', 'External link updated successfully!');
+    const updatedItem = await updateMenuPage(editingItem.id, {
+      title: externalLinkForm.title,
+      url: externalLinkForm.url
+    });
+
+    if (updatedItem) {
+      saveMenuItems(updatedItems);
+      setExternalLinkForm({ title: '', url: 'https://' });
+      setEditingItem(null);
+      setActiveModal(null);
+      showModal('success', 'Success', 'External link updated successfully!');
+    } else {
+      showModal('error', 'Error', 'Failed to update external link!');
+    }
   };
 
   // Preview page
@@ -348,6 +441,7 @@ export function MenuPagesManager() {
 
   const internalPages = [
     { label: 'Home', value: '/' },
+    { label: 'Properties', value: '/properties' },
     { label: 'Login', value: '/login' },
     { label: 'Sign Up', value: '/signup' },
     { label: 'Admin Dashboard', value: '/admin/dashboard' }
@@ -418,7 +512,12 @@ export function MenuPagesManager() {
             <CardTitle className="text-xl font-bold text-[#36454F]">Menu Items</CardTitle>
           </CardHeader>
           <CardContent>
-            {menuItems.length > 0 ? (
+            {isLoading ? (
+              <div className="text-center py-12 text-gray-500">
+                <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium mb-2">Loading menu items...</p>
+              </div>
+            ) : menuItems.length > 0 ? (
               <div className="space-y-3">
                 {menuItems
                   .sort((a, b) => a.order - b.order)

@@ -1,99 +1,122 @@
-import { useEffect, useRef, useState } from 'react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import { useState, useRef, useEffect } from 'react';
+import { Bold, Italic, Underline, List, ListOrdered, AlignLeft } from 'lucide-react';
+import { Button } from './ui/button';
 
 interface RichTextEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  minHeight?: string;
 }
 
-export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorProps) {
-  const [mounted, setMounted] = useState(false);
-  const quillRef = useRef<ReactQuill>(null);
+export function RichTextEditor({ value, onChange, placeholder = 'Enter description...', minHeight = '200px' }: RichTextEditorProps) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [isFocused, setIsFocused] = useState(false);
 
+  // Initialize editor content
   useEffect(() => {
-    setMounted(true);
-    
-    // Suppress findDOMNode warning from react-quill
-    const originalError = console.error;
-    console.error = (...args) => {
-      if (
-        typeof args[0] === 'string' &&
-        args[0].includes('findDOMNode')
-      ) {
-        return;
-      }
-      originalError(...args);
-    };
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value;
+    }
+  }, [value]);
 
-    return () => {
-      console.error = originalError;
-    };
-  }, []);
-
-  const modules = {
-    toolbar: [
-      [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-      [{ 'font': [] }],
-      [{ 'size': ['small', false, 'large', 'huge'] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ 'color': [] }, { 'background': [] }],
-      [{ 'script': 'sub'}, { 'script': 'super' }],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      [{ 'indent': '-1'}, { 'indent': '+1' }],
-      [{ 'align': [] }],
-      ['blockquote', 'code-block'],
-      ['link', 'image', 'video'],
-      ['clean']
-    ]
+  const handleInput = () => {
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML);
+    }
   };
 
-  const formats = [
-    'header', 'font', 'size',
-    'bold', 'italic', 'underline', 'strike',
-    'color', 'background',
-    'script',
-    'list', 'bullet', 'indent',
-    'align',
-    'blockquote', 'code-block',
-    'link', 'image', 'video'
-  ];
+  const executeCommand = (command: string, value: string | undefined = undefined) => {
+    document.execCommand(command, false, value);
+    editorRef.current?.focus();
+    handleInput();
+  };
 
-  if (!mounted) {
-    return (
-      <div className="border border-gray-300 rounded-md p-4 bg-gray-50 min-h-[400px] flex items-center justify-center">
-        <p className="text-gray-500">Loading editor...</p>
-      </div>
-    );
-  }
+  const formatButton = (command: string, icon: React.ReactNode, label: string) => (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={(e) => {
+        e.preventDefault();
+        executeCommand(command);
+      }}
+      className="h-8 w-8 p-0 hover:bg-[#FAF4EC]"
+      title={label}
+    >
+      {icon}
+    </Button>
+  );
 
   return (
-    <div className="rich-text-editor">
+    <div className={`border rounded-lg ${isFocused ? 'ring-2 ring-[#6B7F39] border-[#6B7F39]' : 'border-gray-300'}`}>
+      {/* Toolbar */}
+      <div className="flex items-center gap-1 p-2 border-b border-gray-200 bg-gray-50 rounded-t-lg flex-wrap">
+        {formatButton('bold', <Bold className="w-4 h-4" />, 'Bold (Ctrl+B)')}
+        {formatButton('italic', <Italic className="w-4 h-4" />, 'Italic (Ctrl+I)')}
+        {formatButton('underline', <Underline className="w-4 h-4" />, 'Underline (Ctrl+U)')}
+        
+        <div className="w-px h-6 bg-gray-300 mx-1" />
+        
+        {formatButton('insertUnorderedList', <List className="w-4 h-4" />, 'Bullet List')}
+        {formatButton('insertOrderedList', <ListOrdered className="w-4 h-4" />, 'Numbered List')}
+        
+        <div className="w-px h-6 bg-gray-300 mx-1" />
+        
+        {formatButton('justifyLeft', <AlignLeft className="w-4 h-4" />, 'Align Left')}
+        
+        <div className="w-px h-6 bg-gray-300 mx-1" />
+        
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.preventDefault();
+            executeCommand('removeFormat');
+          }}
+          className="h-8 px-2 text-xs hover:bg-[#FAF4EC]"
+          title="Clear Formatting"
+        >
+          Clear Format
+        </Button>
+      </div>
+
+      {/* Editor */}
+      <div
+        ref={editorRef}
+        contentEditable
+        onInput={handleInput}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        className="p-3 outline-none overflow-y-auto"
+        style={{ minHeight }}
+        data-placeholder={placeholder}
+        suppressContentEditableWarning
+      />
+
       <style>{`
-        .rich-text-editor .ql-container {
-          min-height: 400px;
-          font-size: 16px;
+        [contenteditable]:empty:before {
+          content: attr(data-placeholder);
+          color: #9ca3af;
+          pointer-events: none;
         }
-        .rich-text-editor .ql-editor {
-          min-height: 400px;
+        [contenteditable] ul,
+        [contenteditable] ol {
+          margin-left: 1.5rem;
+          margin-top: 0.5rem;
+          margin-bottom: 0.5rem;
         }
-        .rich-text-editor .ql-toolbar {
-          background: #f9fafb;
-          border-radius: 8px 8px 0 0;
+        [contenteditable] li {
+          margin-bottom: 0.25rem;
         }
-        .rich-text-editor .ql-container {
-          border-radius: 0 0 8px 8px;
+        [contenteditable] p {
+          margin-bottom: 0.5rem;
+        }
+        [contenteditable]:focus {
+          outline: none;
         }
       `}</style>
-      <ReactQuill
-        theme="snow"
-        value={value}
-        onChange={onChange}
-        modules={modules}
-        formats={formats}
-        placeholder={placeholder || 'Start writing your content here...'}
-      />
     </div>
   );
 }

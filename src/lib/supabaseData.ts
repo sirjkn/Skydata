@@ -746,7 +746,7 @@ export async function fetchMenuPageBySlug(slug: string): Promise<MenuPage | null
     .from('skyway_menu_pages')
     .select('*')
     .eq('page_slug', slug)
-    .single();
+    .maybeSingle();
   
   if (error) {
     console.error('Error fetching menu page:', error);
@@ -942,6 +942,70 @@ export async function deleteActivityLogs(): Promise<void> {
 }
 
 // ============================================================================
+// DATA MANAGEMENT - CLEAR ALL FUNCTIONS
+// ============================================================================
+
+export async function clearAllProperties(): Promise<void> {
+  ensureConnection();
+  const supabase = getClient();
+  
+  const { error } = await supabase
+    .from('skyway_properties')
+    .delete()
+    .neq('property_id', 0); // Delete all records
+  
+  if (error) {
+    console.error('Error clearing all properties:', error);
+    throw error;
+  }
+}
+
+export async function clearAllCustomers(): Promise<void> {
+  ensureConnection();
+  const supabase = getClient();
+  
+  const { error } = await supabase
+    .from('skyway_customers')
+    .delete()
+    .neq('customer_id', 0); // Delete all records
+  
+  if (error) {
+    console.error('Error clearing all customers:', error);
+    throw error;
+  }
+}
+
+export async function clearAllBookings(): Promise<void> {
+  ensureConnection();
+  const supabase = getClient();
+  
+  const { error } = await supabase
+    .from('skyway_bookings')
+    .delete()
+    .neq('booking_id', 0); // Delete all records
+  
+  if (error) {
+    console.error('Error clearing all bookings:', error);
+    throw error;
+  }
+}
+
+export async function clearAllPayments(): Promise<void> {
+  ensureConnection();
+  const supabase = getClient();
+  
+  const { error } = await supabase
+    .from('skyway_payments')
+    .delete()
+    .neq('payment_id', 0); // Delete all records
+  
+  if (error) {
+    console.error('Error clearing all payments:', error);
+    throw error;
+  }
+}
+
+// ============================================================================
 // AUTH USERS
 // ============================================================================
 
@@ -970,7 +1034,7 @@ export async function fetchAuthUserByEmail(email: string): Promise<AuthUser | nu
     .from('skyway_auth_user')
     .select('*')
     .eq('email', email)
-    .single();
+    .maybeSingle();
   
   if (error) {
     console.error('Error fetching auth user:', error);

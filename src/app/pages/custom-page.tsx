@@ -3,30 +3,40 @@ import { useParams, useNavigate } from 'react-router';
 import { Header } from '../components/header';
 import { Button } from '../components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { fetchMenuPages } from '../../lib/supabaseData';
 
 export function CustomPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const [page, setPage] = useState<any>(null);
   const [notFound, setNotFound] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Load menu items from localStorage
-    const savedMenuItems = localStorage.getItem('skyway_menu_items');
-    if (savedMenuItems) {
-      const menuItems = JSON.parse(savedMenuItems);
-      const foundPage = menuItems.find((item: any) => 
-        item.type === 'custom' && item.slug === slug
-      );
-      
-      if (foundPage) {
-        setPage(foundPage);
-      } else {
+    const loadPage = async () => {
+      setIsLoading(true);
+      try {
+        const menuPages = await fetchMenuPages();
+        const foundPage = menuPages.find((item: any) => item.page_slug === slug);
+        
+        if (foundPage) {
+          setPage({
+            title: foundPage.page_name,
+            content: foundPage.page_content,
+            slug: foundPage.page_slug
+          });
+        } else {
+          setNotFound(true);
+        }
+      } catch (error) {
+        console.error('Failed to load page:', error);
         setNotFound(true);
+      } finally {
+        setIsLoading(false);
       }
-    } else {
-      setNotFound(true);
-    }
+    };
+
+    loadPage();
   }, [slug]);
 
   if (notFound) {
@@ -48,7 +58,7 @@ export function CustomPage() {
     );
   }
 
-  if (!page) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#FAF4EC]">
         <Header />

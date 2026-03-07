@@ -2,9 +2,11 @@
 import { createBrowserRouter } from "react-router";
 import { RootLayout } from "./components/RootLayout";
 import { Home } from "./pages/home";
+import { AllProperties } from "./pages/all-properties";
 import { PropertyDetails } from "./pages/property-details";
 import { Login } from "./pages/login";
 import { Signup } from "./pages/signup";
+import { Setup } from "./pages/setup";
 import { AdminDashboard } from "./pages/admin-dashboard";
 import { Settings } from "./pages/settings";
 import { CustomPage } from "./pages/custom-page";
@@ -23,6 +25,10 @@ export const router = createBrowserRouter([
         Component: Home,
       },
       {
+        path: "properties",
+        Component: AllProperties,
+      },
+      {
         path: "property/:id",
         Component: PropertyDetails,
       },
@@ -33,6 +39,10 @@ export const router = createBrowserRouter([
       {
         path: "signup",
         Component: Signup,
+      },
+      {
+        path: "setup",
+        Component: Setup,
       },
       {
         path: "reset-password",

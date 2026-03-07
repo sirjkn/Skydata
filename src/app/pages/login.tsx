@@ -153,7 +153,7 @@ export function Login() {
 
               {/* Create Account Link */}
               <div className="mt-4 text-center pt-4 border-t">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 mb-2">
                   Don't have an account?{' '}
                   <button
                     type="button"
@@ -161,6 +161,16 @@ export function Login() {
                     className="text-[#6B7F39] hover:text-[#5a6930] font-semibold"
                   >
                     Create Account
+                  </button>
+                </p>
+                <p className="text-xs text-gray-500">
+                  First time setup?{' '}
+                  <button
+                    type="button"
+                    onClick={() => navigate('/setup')}
+                    className="text-[#6B7F39] hover:text-[#5a6930] font-semibold underline"
+                  >
+                    Initialize Database
                   </button>
                 </p>
               </div>

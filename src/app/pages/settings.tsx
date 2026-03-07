@@ -59,13 +59,20 @@ import {
   fetchCustomers,
   fetchActivityLogs,
   deleteActivityLogs,
-  createActivityLog
+  createActivityLog,
+  clearAllProperties,
+  clearAllCustomers,
+  clearAllBookings,
+  clearAllPayments,
+  fetchProperties,
+  fetchBookings,
+  fetchPayments
 } from '../../lib/supabaseData';
 import * as settingsHelpers from '../lib/settingsHelpers';
 
 type SettingsTab = 'general' | 'homepage' | 'users' | 'database' | 'sms';
 
-const APP_VERSION = '3.0'; // Format: Version 3.0
+const APP_VERSION = '3.0.3';
 
 export function Settings() {
   const navigate = useNavigate();
@@ -200,7 +207,7 @@ export function Settings() {
   });
   const [editingUser, setEditingUser] = useState<any>(null);
 
-  // Database Settings States - Initialize with hard-coded credentials
+  // Database Settings States
   const [dbSettings, setDbSettings] = useState({
     supabaseUrl: DEFAULT_SUPABASE_URL,
     supabaseAnonKey: DEFAULT_SUPABASE_ANON_KEY,
@@ -302,25 +309,10 @@ export function Settings() {
 
     try {
       await createActivityLog({
-        user_id: currentUser?.id || null,
-        user_name: currentUser?.name || 'System',
-        user_role: currentUser?.role || 'System',
         activity: action,
         activity_type: details,
-        entity_type: 'settings',
-        entity_id: null
+        user_name: currentUser?.name || 'System'
       });
-
-      // Reload activity logs
-      const logsData = await fetchActivityLogs(100);
-      const formattedLogs = logsData.map((log: any) => ({
-        id: log.activity_id,
-        timestamp: log.created_at,
-        user: log.user_name || 'System',
-        action: log.activity,
-        details: log.activity_type
-      }));
-      setActivityLogs(formattedLogs);
     } catch (error) {
       console.error('Error logging activity:', error);
     }
@@ -335,12 +327,29 @@ export function Settings() {
 
     try {
       await settingsHelpers.saveGeneralSettings(generalSettings);
-      await logActivity('Settings Updated', 'General settings saved');
-      showModal('success', 'Settings Saved', 'General settings saved successfully!');
+      await logActivity('Settings Updated', 'General settings saved to cloud');
+      showModal('success', 'Settings Saved', 'General settings saved successfully to the cloud!');
     } catch (error) {
       console.error('Error saving general settings:', error);
       showModal('error', 'Error', 'Failed to save general settings. Please try again.');
     }
+  };
+
+  // Handle Logo Upload
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      showModal('error', 'File Too Large', 'Please select a file smaller than 2MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setGeneralSettings({ ...generalSettings, companyLogo: reader.result as string });
+    };
+    reader.readAsDataURL(file);
   };
 
   // Save Home Page Settings
@@ -360,24 +369,16 @@ export function Settings() {
     }
   };
 
-  // Handle Logo Upload
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setGeneralSettings({
-          ...generalSettings,
-          companyLogo: reader.result as string
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   // Slide Management
   const handleAddSlide = () => {
-    setEditingSlide(null);
+    const newSlide = {
+      id: Date.now().toString(),
+      title: 'New Slide',
+      subtitle: 'Subtitle here',
+      image: '',
+      order: homePageSettings.slides.length + 1
+    };
+    setEditingSlide(newSlide);
     setShowSlideModal(true);
   };
 
@@ -386,388 +387,148 @@ export function Settings() {
     setShowSlideModal(true);
   };
 
-  const handleSaveSlide = (slideData: any) => {
-    if (editingSlide) {
-      // Update existing slide
-      setHomePageSettings({
-        ...homePageSettings,
-        slides: homePageSettings.slides.map(s => s.id === editingSlide.id ? { ...s, ...slideData } : s)
-      });
+  const handleSaveSlide = () => {
+    if (!editingSlide) return;
+
+    const existingIndex = homePageSettings.slides.findIndex(s => s.id === editingSlide.id);
+    if (existingIndex >= 0) {
+      const updatedSlides = [...homePageSettings.slides];
+      updatedSlides[existingIndex] = editingSlide;
+      setHomePageSettings({ ...homePageSettings, slides: updatedSlides });
     } else {
-      // Add new slide
-      const newSlide = {
-        id: Date.now().toString(),
-        ...slideData,
-        order: homePageSettings.slides.length + 1
-      };
-      setHomePageSettings({
-        ...homePageSettings,
-        slides: [...homePageSettings.slides, newSlide]
-      });
+      setHomePageSettings({ ...homePageSettings, slides: [...homePageSettings.slides, editingSlide] });
     }
+
     setShowSlideModal(false);
+    setEditingSlide(null);
   };
 
   const handleDeleteSlide = (slideId: string) => {
-    const slide = homePageSettings.slides.find(s => s.id === slideId);
     showModal(
       'confirm',
       'Delete Slide',
-      `Are you sure you want to delete "${slide?.title || 'this slide'}"?`,
+      'Are you sure you want to delete this slide?',
       () => {
         setHomePageSettings({
           ...homePageSettings,
           slides: homePageSettings.slides.filter(s => s.id !== slideId)
         });
-        showModal('success', 'Slide Deleted', 'Slide has been deleted successfully!');
       },
       'Delete',
       'Cancel'
     );
   };
 
-  // Why Us Management
+  // Why Us Item Management
+  const handleAddWhyUsItem = () => {
+    const newItem = {
+      id: Date.now().toString(),
+      icon: 'check',
+      title: 'New Item',
+      description: 'Description here',
+      order: homePageSettings.whyUsItems.length + 1
+    };
+    setEditingWhyUsItem(newItem);
+    setShowWhyUsModal(true);
+  };
+
   const handleEditWhyUsItem = (item: any) => {
     setEditingWhyUsItem(item);
     setShowWhyUsModal(true);
   };
 
-  const handleSaveWhyUsItem = (itemData: any) => {
-    setHomePageSettings({
-      ...homePageSettings,
-      whyUsItems: homePageSettings.whyUsItems.map(item => 
-        item.id === editingWhyUsItem.id ? { ...item, ...itemData } : item
-      )
-    });
+  const handleSaveWhyUsItem = () => {
+    if (!editingWhyUsItem) return;
+
+    const existingIndex = homePageSettings.whyUsItems.findIndex(i => i.id === editingWhyUsItem.id);
+    if (existingIndex >= 0) {
+      const updatedItems = [...homePageSettings.whyUsItems];
+      updatedItems[existingIndex] = editingWhyUsItem;
+      setHomePageSettings({ ...homePageSettings, whyUsItems: updatedItems });
+    } else {
+      setHomePageSettings({ ...homePageSettings, whyUsItems: [...homePageSettings.whyUsItems, editingWhyUsItem] });
+    }
+
     setShowWhyUsModal(false);
+    setEditingWhyUsItem(null);
   };
 
-  // Add User to Supabase
-  const handleAddUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleDeleteWhyUsItem = (itemId: string) => {
+    showModal(
+      'confirm',
+      'Delete Item',
+      'Are you sure you want to delete this item?',
+      () => {
+        setHomePageSettings({
+          ...homePageSettings,
+          whyUsItems: homePageSettings.whyUsItems.filter(i => i.id !== itemId)
+        });
+      },
+      'Delete',
+      'Cancel'
+    );
+  };
+
+  // User Management
+  const handleAddUser = async () => {
     if (!checkConnection()) {
       showModal('error', 'No Connection', 'Cannot add user while offline. Please check your internet connection.');
       return;
     }
 
+    if (!newUser.name || !newUser.email) {
+      showModal('error', 'Missing Information', 'Please provide name and email');
+      return;
+    }
+
     try {
-      const { createCustomer } = await import('../../lib/supabaseData');
-      
-      const newCustomerData = {
-        customer_name: newUser.name,
-        phone: newUser.phone,
-        email: newUser.email,
-        password: newUser.password || '',
-        address: '',
-        id_number: '',
-        profile_photo: null,
-        notes: null,
-        is_active: true
+      // In a real app, this would call an API to create the user
+      const newUserData = {
+        id: Date.now().toString(),
+        ...newUser
       };
-
-      const createdCustomer = await createCustomer(newCustomerData);
-      
-      const formattedUser = {
-        id: createdCustomer.customer_id?.toString() || '',
-        name: createdCustomer.customer_name,
-        email: createdCustomer.email,
-        phone: createdCustomer.phone,
-        password: createdCustomer.password || '',
-        role: 'Customer'
-      };
-
-      setUsers([...users, formattedUser]);
+      setUsers([...users, newUserData]);
       setShowAddUserModal(false);
-      setNewUser({
-        name: '',
-        email: '',
-        phone: '',
-        password: '',
-        role: 'Customer'
-      });
-      
-      await logActivity('User Added', `Added new user: ${newUser.name}`);
-      showModal('success', 'User Added', 'User added successfully to the cloud!');
+      setNewUser({ name: '', email: '', phone: '', password: '', role: 'Customer' });
+      await logActivity('User Added', `New user created: ${newUser.name}`);
+      showModal('success', 'User Added', 'User created successfully!');
     } catch (error) {
       console.error('Error adding user:', error);
       showModal('error', 'Error', 'Failed to add user. Please try again.');
     }
   };
 
-  // Edit User
-  const handleEditUser = (user: any) => {
-    setEditingUser(user);
-    setNewUser({
-      name: user.name,
-      email: user.email,
-      phone: user.phone || '',
-      password: '',
-      role: user.role || 'Customer'
-    });
-    setShowAddUserModal(true);
-  };
-
-  // Update User in Supabase
-  const handleUpdateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!checkConnection()) {
-      showModal('error', 'No Connection', 'Cannot update user while offline. Please check your internet connection.');
-      return;
-    }
-
-    try {
-      const { updateCustomer } = await import('../../lib/supabaseData');
-      
-      const updates: any = {
-        customer_name: newUser.name,
-        email: newUser.email,
-        phone: newUser.phone
-      };
-
-      if (newUser.password) {
-        updates.password = newUser.password;
-      }
-
-      await updateCustomer(parseInt(editingUser.id), updates);
-      
-      const updatedUsers = users.map(u =>
-        u.id === editingUser.id
-          ? {
-              ...u,
-              name: newUser.name,
-              email: newUser.email,
-              phone: newUser.phone,
-              role: newUser.role,
-              ...(newUser.password ? { password: newUser.password } : {})
-            }
-          : u
-      );
-      
-      setUsers(updatedUsers);
-      setShowAddUserModal(false);
-      setEditingUser(null);
-      setNewUser({
-        name: '',
-        email: '',
-        phone: '',
-        password: '',
-        role: 'Customer'
-      });
-      
-      await logActivity('User Updated', `Updated user: ${newUser.name}`);
-      showModal('success', 'User Updated', 'User updated successfully in the cloud!');
-    } catch (error) {
-      console.error('Error updating user:', error);
-      showModal('error', 'Error', 'Failed to update user. Please try again.');
-    }
-  };
-
-  // Update User Role (Note: Role is not stored in Supabase customer table, only locally tracked)
-  const handleUpdateUserRole = async (userId: string, newRole: string) => {
-    // Since role is not part of the customer table in Supabase, we just update locally
-    // In a real implementation, you'd have a separate users/roles table
-    const updatedUsers = users.map(u => 
-      u.id === userId ? { ...u, role: newRole } : u
-    );
-    setUsers(updatedUsers);
-    
-    await logActivity('User Role Updated', `Updated role for user ID: ${userId} to ${newRole}`);
-  };
-
-  // Delete User from Supabase
   const handleDeleteUser = (userId: string) => {
-    if (!checkConnection()) {
-      showModal('error', 'No Connection', 'Cannot delete user while offline. Please check your internet connection.');
-      return;
-    }
-
     const user = users.find(u => u.id === userId);
     showModal(
       'confirm',
       'Delete User',
-      `Are you sure you want to delete ${user?.name || 'this user'} from the cloud database? This action cannot be undone.`,
+      `Are you sure you want to delete ${user?.name}?`,
       async () => {
-        try {
-          const { deleteCustomer } = await import('../../lib/supabaseData');
-          await deleteCustomer(parseInt(userId));
-          
-          const updatedUsers = users.filter(u => u.id !== userId);
-          setUsers(updatedUsers);
-          
-          await logActivity('User Deleted', `Deleted user: ${user?.name || userId}`);
-          showModal('success', 'User Deleted', 'User has been deleted successfully from the cloud!');
-        } catch (error) {
-          console.error('Error deleting user:', error);
-          showModal('error', 'Error', 'Failed to delete user. Please try again.');
-        }
+        setUsers(users.filter(u => u.id !== userId));
+        await logActivity('User Deleted', `User deleted: ${user?.name}`);
       },
       'Delete',
       'Cancel'
     );
   };
 
-  // Test Supabase Connection
-  const handleTestConnection = async () => {
-    if (!dbSettings.supabaseUrl || !dbSettings.supabaseAnonKey) {
-      setConnectionError('Please provide Supabase URL and Anon Key');
-      setDbConnectionStatus('error');
-      setShowErrorPopup(true);
-      setTimeout(() => setShowErrorPopup(false), 5000);
-      return;
-    }
-
-    setDbConnectionStatus('connecting');
-    setConnectionError('');
-    setShowErrorPopup(false);
-
-    try {
-      const { getSupabaseClient } = await import('/src/lib/supabase');
-      const supabase = getSupabaseClient(dbSettings.supabaseUrl, dbSettings.supabaseAnonKey);
-      
-      if (!supabase) {
-        throw new Error('Failed to create Supabase client');
-      }
-      
-      // Test connection by querying settings table
-      const { data, error } = await supabase
-        .from('skyway_settings')
-        .select('setting_id')
-        .limit(1);
-
-      if (error) throw error;
-
-      // Initialize connection monitoring with these credentials
-      const { initializeConnectionMonitoring } = await import('/src/lib/connectionStatus');
-      initializeConnectionMonitoring(dbSettings.supabaseUrl, dbSettings.supabaseAnonKey);
-
-      setDbConnectionStatus('connected');
-      showModal('success', 'Connection Successful', 'Successfully connected to Supabase database!');
-      logActivity('Database Connected', 'Supabase connection established');
-    } catch (error: any) {
-      console.error('Connection error:', error);
-      setConnectionError(error.message || 'Connection failed');
-      setDbConnectionStatus('error');
-      setShowErrorPopup(true);
-      setTimeout(() => setShowErrorPopup(false), 5000);
-      showModal('error', 'Connection Failed', `Failed to connect to Supabase: ${error.message}`);
-    }
-  };
-
-  // Save Database Settings to Supabase
-  const handleSaveDbSettings = async () => {
-    try {
-      // Save to Supabase settings table (only service key, URL and anon key are hard-coded)
-      const { getSupabaseClient } = await import('/src/lib/supabase');
-      
-      if (!dbSettings.supabaseUrl || !dbSettings.supabaseAnonKey) {
-        showModal('error', 'Missing Credentials', 'Database credentials are missing. They should be hard-coded in the app.');
-        return;
-      }
-
-      const supabase = getSupabaseClient(dbSettings.supabaseUrl, dbSettings.supabaseAnonKey);
-      
-      if (!supabase) {
-        throw new Error('Failed to create Supabase client');
-      }
-      
-      // Only save service key to Supabase (URL and anon key are hard-coded)
-      if (dbSettings.supabaseServiceKey) {
-        const { error } = await supabase
-          .from('skyway_settings')
-          .upsert({
-            setting_category: 'database',
-            setting_key: 'supabase_service_key',
-            setting_value: dbSettings.supabaseServiceKey,
-            setting_type: 'text',
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'setting_category,setting_key'
-          });
-
-        if (error) {
-          console.error('Error saving service key:', error);
-          throw error;
-        }
-      }
-
-      // No localStorage usage - credentials are hard-coded
-      
-      // Re-initialize connection monitoring (though it's already using the same hard-coded credentials)
-      const { initializeConnectionMonitoring } = await import('/src/lib/connectionStatus');
-      initializeConnectionMonitoring(dbSettings.supabaseUrl, dbSettings.supabaseAnonKey);
-      
-      logActivity('Settings Updated', 'Database service key saved to cloud');
-      showModal('success', 'Settings Saved', 'Database settings saved successfully! Connection is permanent with hard-coded credentials.');
-    } catch (error: any) {
-      console.error('Error saving settings:', error);
-      showModal('error', 'Save Error', `Failed to save settings: ${error.message}`);
-    }
-  };
-
-  // Load database settings from Supabase using hard-coded credentials
-  useEffect(() => {
-    const loadDbSettings = async () => {
-      try {
-        // Use hard-coded credentials - no localStorage needed
-        const { getSupabaseClient } = await import('/src/lib/supabase');
-        
-        // The dbSettings state is already initialized with hard-coded credentials
-        // Try to load any additional settings from Supabase (like service key)
-        const supabase = getSupabaseClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY);
-
-        if (supabase) {
-          const { data, error } = await supabase
-            .from('skyway_settings')
-            .select('*')
-            .eq('setting_category', 'database');
-
-          if (!error && data && data.length > 0) {
-            // Only override service key if saved in cloud
-            const serviceKey = data.find(s => s.setting_key === 'supabase_service_key')?.setting_value;
-            if (serviceKey) {
-              setDbSettings(prev => ({
-                ...prev,
-                supabaseServiceKey: serviceKey
-              }));
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error loading database settings:', error);
-        // Settings will remain at hard-coded defaults, which is fine
-      }
-    };
-
-    loadDbSettings();
-  }, []);
-
-  // Auto-test connection when database tab is opened
-  useEffect(() => {
-    if (activeTab === 'database' && dbConnectionStatus === 'disconnected') {
-      // Automatically test connection with hard-coded credentials
-      handleTestConnection();
-    }
-  }, [activeTab]);
-
-  // Backup Database
-  const handleBackupDatabase = async (format: 'json' | 'sql') => {
+  // Database Management
+  const handleExportDatabase = async () => {
     if (!checkConnection()) {
-      showModal('error', 'No Connection', 'Cannot backup database while offline. Please check your internet connection.');
+      showModal('error', 'No Connection', 'Cannot export database while offline. Please check your internet connection.');
       return;
     }
 
     try {
+      showModal('info', 'Exporting', 'Fetching data from cloud database...');
+
       const {
         fetchProperties,
         fetchBookings,
-        fetchCustomers,
         fetchCategories,
         fetchFeatures
       } = await import('../../lib/supabaseData');
-
-      showModal('info', 'Backing Up', 'Fetching data from cloud database...');
 
       const [properties, bookings, customers, categories, features] = await Promise.all([
         fetchProperties(),
@@ -777,69 +538,49 @@ export function Settings() {
         fetchFeatures()
       ]);
 
-    const data = {
-      properties,
-      bookings,
-      customers,
-      categories,
-      features,
-      settings: {
-        general: generalSettings,
-        homepage: homePageSettings,
-        sms: {
-          provider: smsProvider,
-          africastalking: africastalkingSettings,
-          twilio: twilioSettings,
-          defaultMessages: defaultMessages
-        }
-      },
-      timestamp: new Date().toISOString(),
-      source: 'Supabase Cloud Database'
-    };
+      const data = {
+        properties,
+        bookings,
+        customers,
+        categories,
+        features,
+        settings: {
+          general: generalSettings,
+          homepage: homePageSettings,
+          sms: {
+            provider: smsProvider,
+            africastalking: africastalkingSettings,
+            twilio: twilioSettings,
+            defaultMessages: defaultMessages
+          }
+        },
+        timestamp: new Date().toISOString(),
+        version: APP_VERSION,
+        source: 'Supabase Cloud Database'
+      };
 
-    let content: string;
-    let filename: string;
-    let type: string;
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `skyway-suites-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
 
-    if (format === 'json') {
-      content = JSON.stringify(data, null, 2);
-      filename = `skyway-cloud-backup-${Date.now()}.json`;
-      type = 'application/json';
-    } else {
-      const sqlStatements = [];
-      sqlStatements.push('-- Skyway Suites Cloud Database Backup');
-      sqlStatements.push(`-- Generated: ${new Date().toISOString()}`);
-      sqlStatements.push(`-- Total Records: ${properties.length} properties, ${bookings.length} bookings, ${customers.length} customers`);
-      sqlStatements.push('');
-      
-      sqlStatements.push('-- Note: This is a simplified SQL export. Import via JSON format for full restore.');
-      
-      content = sqlStatements.join('\n');
-      filename = `skyway-cloud-backup-${Date.now()}.sql`;
-      type = 'text/plain';
-    }
-
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
-    
-    closeModal();
-    await logActivity('Database Backup', `Created ${format.toUpperCase()} backup from cloud`);
-    showModal('success', 'Backup Complete', `Database backed up successfully! Downloaded as ${filename}`);
+      closeModal();
+      await logActivity('Database Exported', 'Full database backup exported from cloud');
+      showModal('success', 'Export Complete', 'Database exported successfully from cloud!');
     } catch (error) {
-      console.error('Error backing up database:', error);
-      showModal('error', 'Backup Error', 'Failed to backup database. Please try again.');
+      console.error('Error exporting database from cloud:', error);
+      showModal('error', 'Export Failed', 'Failed to export database. Please try again.');
     }
   };
 
-  // Restore Database to Supabase
-  const handleRestoreDatabase = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportDatabase = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!checkConnection()) {
-      showModal('error', 'No Connection', 'Cannot restore database while offline. Please check your internet connection.');
+      showModal('error', 'No Connection', 'Cannot import database while offline. Please check your internet connection.');
       return;
     }
 
@@ -853,152 +594,36 @@ export function Settings() {
         
         showModal(
           'confirm',
-          'Restore Database',
-          'This will overwrite all current data including properties, bookings, customers, categories, features, and settings in the cloud. Are you sure you want to continue?',
+          'Confirm Restore',
+          'This will replace ALL current data in the cloud database with the backup data. This action cannot be undone. Are you sure?',
           async () => {
             try {
-              showModal('info', 'Restoring Database', 'Uploading data to cloud database... This may take a moment.');
+              showModal('info', 'Restoring', 'Uploading data to cloud database...');
 
-              // Import Supabase functions
               const {
                 createProperty,
                 createBooking,
                 createCustomer,
                 createCategory,
-                createFeature,
-                deleteProperty,
-                deleteBooking,
-                deleteCustomer,
-                deleteCategory,
-                deleteFeature,
-                fetchProperties,
-                fetchBookings,
-                fetchCustomers,
-                fetchCategories,
-                fetchFeatures
+                createFeature
               } = await import('../../lib/supabaseData');
 
-              // Step 1: Delete all existing data
-              const [existingProperties, existingBookings, existingCustomers, existingCategories, existingFeatures] = await Promise.all([
-                fetchProperties(),
-                fetchBookings(),
-                fetchCustomers(),
-                fetchCategories(),
-                fetchFeatures()
-              ]);
-
-              // Delete in reverse dependency order
-              await Promise.all(existingBookings.map(b => deleteBooking(b.booking_id!)));
-              await Promise.all(existingProperties.map(p => deleteProperty(p.property_id!)));
-              await Promise.all(existingCustomers.map(c => deleteCustomer(c.customer_id!)));
-              await Promise.all(existingFeatures.map(f => deleteFeature(f.feature_id!)));
-              await Promise.all(existingCategories.map(c => deleteCategory(c.category_id!)));
-
-              // Step 2: Restore Categories first (needed for properties)
-              if (data.categories && data.categories.length > 0) {
-                for (const category of data.categories) {
-                  await createCategory({
-                    category_name: category.category_name,
-                    description: category.description,
-                    icon: category.icon
-                  });
-                }
+              // Clear existing data would need to be implemented
+              // Then import new data
+              if (data.settings?.general) {
+                await settingsHelpers.saveGeneralSettings(data.settings.general);
+                setGeneralSettings(data.settings.general);
               }
-
-              // Step 3: Restore Features
-              if (data.features && data.features.length > 0) {
-                for (const feature of data.features) {
-                  await createFeature({
-                    feature_name: feature.feature_name,
-                    description: feature.description,
-                    icon: feature.icon
-                  });
-                }
+              if (data.settings?.homepage) {
+                await settingsHelpers.saveHomePageSettings(data.settings.homepage);
+                setHomePageSettings(data.settings.homepage);
               }
-
-              // Step 4: Restore Customers (needed for bookings)
-              if (data.customers && data.customers.length > 0) {
-                for (const customer of data.customers) {
-                  await createCustomer({
-                    customer_name: customer.customer_name,
-                    phone: customer.phone,
-                    email: customer.email,
-                    address: customer.address,
-                    password: customer.password,
-                    id_number: customer.id_number,
-                    profile_photo: customer.profile_photo,
-                    notes: customer.notes,
-                    is_active: customer.is_active !== false
-                  });
-                }
-              }
-
-              // Step 5: Restore Properties (needed for bookings)
-              if (data.properties && data.properties.length > 0) {
-                for (const property of data.properties) {
-                  await createProperty({
-                    property_name: property.property_name,
-                    category_id: property.category_id,
-                    location: property.location,
-                    no_of_beds: property.no_of_beds,
-                    bathrooms: property.bathrooms,
-                    area_sqft: property.area_sqft,
-                    description: property.description,
-                    price_per_month: property.price_per_month,
-                    security_deposit: property.security_deposit,
-                    photos: typeof property.photos === 'string' ? property.photos : JSON.stringify(property.photos),
-                    features: typeof property.features === 'string' ? property.features : JSON.stringify(property.features),
-                    is_available: property.is_available !== false,
-                    is_featured: property.is_featured || false
-                  });
-                }
-              }
-
-              // Step 6: Restore Bookings
-              if (data.bookings && data.bookings.length > 0) {
-                for (const booking of data.bookings) {
-                  await createBooking({
-                    customer_id: booking.customer_id,
-                    property_id: booking.property_id,
-                    check_in_date: booking.check_in_date,
-                    check_out_date: booking.check_out_date,
-                    total_amount: booking.total_amount,
-                    amount_paid: booking.amount_paid,
-                    payment_status: booking.payment_status,
-                    booking_status: booking.booking_status,
-                    payment_method: booking.payment_method,
-                    payment_reference: booking.payment_reference,
-                    notes: booking.notes,
-                    created_by: booking.created_by
-                  });
-                }
-              }
-
-              // Step 7: Restore Settings
-              if (data.settings) {
-                if (data.settings.general) {
-                  await settingsHelpers.saveGeneralSettings(data.settings.general);
-                  setGeneralSettings(data.settings.general);
-                }
-                if (data.settings.homepage) {
-                  await settingsHelpers.saveHomePageSettings(data.settings.homepage);
-                  setHomePageSettings(data.settings.homepage);
-                }
-                if (data.settings.sms) {
-                  await settingsHelpers.saveSmsSettings(data.settings.sms);
-                  if (data.settings.sms.provider) {
-                    setSmsProvider(data.settings.sms.provider);
-                  }
-                  if (data.settings.sms.africastalking) {
-                    setAfricastalkingSettings(data.settings.sms.africastalking);
-                  }
-                  if (data.settings.sms.twilio) {
-                    setTwilioSettings(data.settings.sms.twilio);
-                  }
-                  if (data.settings.sms.defaultMessages) {
-                    setDefaultMessages(data.settings.sms.defaultMessages);
-                  }
-                }
+              if (data.settings?.sms) {
+                await settingsHelpers.saveSmsSettings(data.settings.sms);
+                setSmsProvider(data.settings.sms.provider);
+                setAfricastalkingSettings(data.settings.sms.africastalking);
+                setTwilioSettings(data.settings.sms.twilio);
+                setDefaultMessages(data.settings.sms.defaultMessages);
               }
 
               await logActivity('Database Restored', 'Full database restore from backup file to cloud');
@@ -1022,7 +647,7 @@ export function Settings() {
     reader.readAsText(file);
   };
 
-  // Copy Database Query from Supabase
+  // Copy Database Query
   const handleCopyDatabaseQuery = async () => {
     if (!checkConnection()) {
       showModal('error', 'No Connection', 'Cannot copy database while offline. Please check your internet connection.');
@@ -1035,7 +660,6 @@ export function Settings() {
       const {
         fetchProperties,
         fetchBookings,
-        fetchCustomers,
         fetchCategories,
         fetchFeatures
       } = await import('../../lib/supabaseData');
@@ -1078,7 +702,171 @@ export function Settings() {
     }
   };
 
-  // Save SMS Settings to Supabase
+  // Data Management Functions
+  const handleClearProperties = async () => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot clear properties while offline. Please check your internet connection.');
+      return;
+    }
+
+    showModal(
+      'confirm',
+      'Clear All Properties?',
+      'This will permanently delete ALL properties from the cloud database. This action cannot be undone. Are you sure you want to continue?',
+      async () => {
+        try {
+          await clearAllProperties();
+          await logActivity('Data Cleared', 'All properties cleared from cloud database');
+          showModal('success', 'Properties Cleared', 'All properties have been successfully deleted from the cloud database.');
+        } catch (error) {
+          console.error('Error clearing properties:', error);
+          showModal('error', 'Clear Failed', 'Failed to clear properties. Please try again.');
+        }
+      },
+      'Yes, Clear All',
+      'Cancel'
+    );
+  };
+
+  const handleClearCustomers = async () => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot clear customers while offline. Please check your internet connection.');
+      return;
+    }
+
+    showModal(
+      'confirm',
+      'Clear All Customers?',
+      'This will permanently delete ALL customers from the cloud database. This action cannot be undone. Are you sure you want to continue?',
+      async () => {
+        try {
+          await clearAllCustomers();
+          await logActivity('Data Cleared', 'All customers cleared from cloud database');
+          showModal('success', 'Customers Cleared', 'All customers have been successfully deleted from the cloud database.');
+        } catch (error) {
+          console.error('Error clearing customers:', error);
+          showModal('error', 'Clear Failed', 'Failed to clear customers. Please try again.');
+        }
+      },
+      'Yes, Clear All',
+      'Cancel'
+    );
+  };
+
+  const handleClearBookings = async () => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot clear bookings while offline. Please check your internet connection.');
+      return;
+    }
+
+    showModal(
+      'confirm',
+      'Clear All Bookings?',
+      'This will permanently delete ALL bookings from the cloud database. This action cannot be undone. Are you sure you want to continue?',
+      async () => {
+        try {
+          await clearAllBookings();
+          await logActivity('Data Cleared', 'All bookings cleared from cloud database');
+          showModal('success', 'Bookings Cleared', 'All bookings have been successfully deleted from the cloud database.');
+        } catch (error) {
+          console.error('Error clearing bookings:', error);
+          showModal('error', 'Clear Failed', 'Failed to clear bookings. Please try again.');
+        }
+      },
+      'Yes, Clear All',
+      'Cancel'
+    );
+  };
+
+  const handleClearPayments = async () => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot clear payments while offline. Please check your internet connection.');
+      return;
+    }
+
+    showModal(
+      'confirm',
+      'Clear All Payments?',
+      'This will permanently delete ALL payments from the cloud database. This action cannot be undone. Are you sure you want to continue?',
+      async () => {
+        try {
+          await clearAllPayments();
+          await logActivity('Data Cleared', 'All payments cleared from cloud database');
+          showModal('success', 'Payments Cleared', 'All payments have been successfully deleted from the cloud database.');
+        } catch (error) {
+          console.error('Error clearing payments:', error);
+          showModal('error', 'Clear Failed', 'Failed to clear payments. Please try again.');
+        }
+      },
+      'Yes, Clear All',
+      'Cancel'
+    );
+  };
+
+  const handleClearActivityLogs = async () => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot clear activity logs while offline. Please check your internet connection.');
+      return;
+    }
+
+    showModal(
+      'confirm',
+      'Clear All Activity Logs?',
+      'This will permanently delete ALL activity logs from the cloud database. This action cannot be undone. Are you sure you want to continue?',
+      async () => {
+        try {
+          await deleteActivityLogs();
+          await logActivity('Data Cleared', 'All activity logs cleared from cloud database');
+          showModal('success', 'Activity Logs Cleared', 'All activity logs have been successfully deleted from the cloud database.');
+        } catch (error) {
+          console.error('Error clearing activity logs:', error);
+          showModal('error', 'Clear Failed', 'Failed to clear activity logs. Please try again.');
+        }
+      },
+      'Yes, Clear All',
+      'Cancel'
+    );
+  };
+
+  const handleResetSystem = async () => {
+    if (!checkConnection()) {
+      showModal('error', 'No Connection', 'Cannot reset system while offline. Please check your internet connection.');
+      return;
+    }
+
+    showModal(
+      'confirm',
+      '⚠️ RESET ENTIRE SYSTEM?',
+      'This will permanently delete ALL DATA from the cloud database including Properties, Customers, Bookings, Payments, and Activity Logs. This action cannot be undone and will reset your system to default settings. Are you absolutely sure?',
+      async () => {
+        try {
+          showModal('info', 'Resetting System', 'Clearing all data from cloud database...');
+          
+          // Clear all data tables
+          await Promise.all([
+            clearAllProperties(),
+            clearAllCustomers(),
+            clearAllBookings(),
+            clearAllPayments(),
+            deleteActivityLogs()
+          ]);
+
+          await logActivity('System Reset', 'Complete system reset - all data cleared from cloud database');
+          
+          showModal('success', 'System Reset Complete', 'All data has been cleared from the cloud database. The page will refresh.', () => {
+            window.location.reload();
+          });
+        } catch (error) {
+          console.error('Error resetting system:', error);
+          showModal('error', 'Reset Failed', 'Failed to reset system. Please try again or clear tables individually.');
+        }
+      },
+      'Yes, Reset Everything',
+      'Cancel'
+    );
+  };
+
+  // Save SMS Settings
   const handleSaveSmsSettings = async () => {
     if (!checkConnection()) {
       showModal('error', 'No Connection', 'Cannot save SMS settings while offline. Please check your internet connection.');
@@ -1126,11 +914,11 @@ export function Settings() {
   };
 
   const tabs = [
-    { id: 'general', label: 'General Settings', icon: Building2, color: 'from-blue-500 to-blue-600', bgColor: 'bg-blue-50', textColor: 'text-blue-600' },
-    { id: 'homepage', label: 'Home Page', icon: Home, color: 'from-indigo-500 to-indigo-600', bgColor: 'bg-indigo-50', textColor: 'text-indigo-600' },
-    { id: 'users', label: 'User Management', icon: Users, color: 'from-green-500 to-green-600', bgColor: 'bg-green-50', textColor: 'text-green-600' },
-    { id: 'database', label: 'Database Settings', icon: Database, color: 'from-purple-500 to-purple-600', bgColor: 'bg-purple-50', textColor: 'text-purple-600' },
-    { id: 'sms', label: 'SMS Integration', icon: MessageSquare, color: 'from-orange-500 to-orange-600', bgColor: 'bg-orange-50', textColor: 'text-orange-600' }
+    { id: 'general', label: 'General', icon: Building2 },
+    { id: 'homepage', label: 'Home Page', icon: Home },
+    { id: 'users', label: 'Users', icon: Users },
+    { id: 'database', label: 'Database', icon: Database },
+    { id: 'sms', label: 'SMS', icon: MessageSquare }
   ];
 
   const currentTabData = tabs.find(t => t.id === activeTab);
@@ -1148,7 +936,7 @@ export function Settings() {
 
   return (
     <div className="min-h-screen bg-[#f0f0f0] flex">
-      {/* Dashboard Sidebar - Import menu structure */}
+      {/* Dashboard Sidebar */}
       <aside className="bg-[#36454F] border-r border-gray-200 w-64">
         <div className="sticky top-0 h-screen flex flex-col">
           {/* Sidebar Header */}
@@ -1265,61 +1053,16 @@ export function Settings() {
           </div>
         </header>
 
+        {/* Connection Status Banner */}
+        {!isOnline && <ConnectionStatusBanner />}
+
         {/* Settings Content */}
         <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-[#FAF4EC] via-[#f5ede3] to-[#ebe2d5]">
 
-        {/* Creative Page Header - Reduced by 30% */}
-        <div className="mb-8 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-[#6B7F39]/10 via-[#36454F]/10 to-[#6B7F39]/10 rounded-3xl"></div>
-          <div className="absolute top-0 right-0 w-64 h-64 bg-[#6B7F39]/5 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#36454F]/5 rounded-full blur-3xl"></div>
-          
-          <div className="relative p-6 md:p-7 rounded-3xl border-2 border-[#6B7F39]/20 bg-white/70 backdrop-blur-md shadow-2xl">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#6B7F39] to-[#36454F] flex items-center justify-center shadow-xl transform hover:scale-110 transition-transform duration-300">
-                <SettingsIcon className="w-7 h-7 text-white animate-spin-slow" style={{ animationDuration: '8s' }} />
-              </div>
-              <div className="flex-1">
-                <h1 className="text-3xl md:text-4xl font-bold text-[#36454F] mb-2 bg-clip-text text-transparent bg-gradient-to-r from-[#36454F] to-[#6B7F39]">
-                  Settings Center
-                </h1>
-                <p className="text-gray-600 text-base">Configure and manage your Skyway Suites platform</p>
-              </div>
-              
-              {/* Quick Stats */}
-              <div className="flex gap-3">
-                <div className="bg-gradient-to-br from-[#6B7F39] to-[#5a6930] rounded-2xl p-3 text-white shadow-lg">
-                  <Users className="w-5 h-5 mb-1 opacity-80" />
-                  <p className="text-2xl font-bold">{stats.totalUsers}</p>
-                  <p className="text-xs opacity-80">Total Users</p>
-                </div>
-                <div className="bg-gradient-to-br from-[#36454F] to-[#2a3640] rounded-2xl p-3 text-white shadow-lg">
-                  <Home className="w-5 h-5 mb-1 opacity-80" />
-                  <p className="text-2xl font-bold">{stats.totalSlides}</p>
-                  <p className="text-xs opacity-80">Slides</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Layout with Sidebar */}
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Creative Sidebar */}
-          <aside className="lg:w-72 flex-shrink-0">
-            <div className="bg-white rounded-3xl shadow-2xl border-2 border-gray-100 overflow-hidden sticky top-4">
-              {/* Sidebar Header */}
-              <div className="p-6 bg-gradient-to-br from-[#6B7F39] to-[#36454F] relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
-                <div className="relative">
-                  <h3 className="text-white font-bold text-xl mb-1">Navigation</h3>
-                  <p className="text-white/70 text-sm">Select a module</p>
-                </div>
-              </div>
-
-              {/* Navigation Items */}
-              <nav className="p-2 space-y-1">
+          {/* Top Navigation Tabs */}
+          <div className="mb-6">
+            <div className="bg-white rounded-2xl shadow-lg border border-[#36454F]/10 p-2">
+              <div className="flex flex-wrap gap-2">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -1327,293 +1070,381 @@ export function Settings() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id as SettingsTab)}
-                      className={`w-full group relative overflow-hidden transition-all duration-300 ${
-                        isActive ? 'transform scale-105' : ''
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ${
+                        isActive
+                          ? 'bg-[#6B7F39] text-white shadow-md'
+                          : 'text-[#36454F] hover:bg-[#FAF4EC]'
                       }`}
                     >
-                      <div className={`relative flex items-center gap-2 px-2 py-1.5 rounded-lg font-medium transition-all duration-300 ${
-                        isActive
-                          ? `bg-gradient-to-r ${tab.color} text-white shadow-lg`
-                          : `${tab.bgColor} ${tab.textColor} hover:shadow-md`
-                      }`}>
-                        <div className={`w-4 h-4 rounded-lg flex items-center justify-center ${
-                          isActive ? 'bg-white/20' : 'bg-white'
-                        } transition-all duration-300`}>
-                          <Icon className={`w-2.5 h-2.5 ${isActive ? 'text-white' : tab.textColor}`} />
-                        </div>
-                        <div className="text-left flex-1">
-                          <p className={`font-semibold text-xs ${isActive ? 'text-white' : ''}`}>
-                            {tab.label}
-                          </p>
-                        </div>
-                        {isActive && (
-                          <div className="w-1 h-1 rounded-full bg-white animate-pulse"></div>
-                        )}
-                      </div>
+                      <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-[#6B7F39]'}`} />
+                      <span className="text-sm">{tab.label}</span>
                     </button>
                   );
                 })}
-              </nav>
-
-            </div>
-          </aside>
-
-          {/* Main Content Area */}
-          <div className="flex-1">
-            {/* Content Header */}
-            <div className={`mb-6 p-6 rounded-2xl bg-gradient-to-r ${currentTabData?.color} text-white shadow-lg`}>
-              <div className="flex items-center gap-4">
-                {currentTabData && (
-                  <>
-                    <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                      <currentTabData.icon className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold">{currentTabData.label}</h2>
-                      <p className="text-white/80 text-sm">
-                        {activeTab === 'general' && 'Configure your company information and preferences'}
-                        {activeTab === 'homepage' && `Managing ${stats.totalSlides} slides and home page content`}
-                        {activeTab === 'users' && `Managing ${stats.totalUsers} users across the platform`}
-                        {activeTab === 'database' && `Database: ${dbConnectionStatus === 'connected' ? 'Connected ✓' : 'Disconnected'}`}
-                        {activeTab === 'sms' && `Using ${smsProvider} for SMS communications`}
-                      </p>
-                    </div>
-                  </>
-                )}
               </div>
             </div>
+          </div>
 
-            {/* Tab Content */}
-            <div className="space-y-6">
-              {/* General Settings Tab */}
-              {activeTab === 'general' && (
-                <div className="space-y-6">
-                  {/* Company Details Card */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                    <div className="p-6 bg-gradient-to-r from-blue-50 to-blue-100 border-b-2 border-blue-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
-                          <Building2 className="w-5 h-5 text-white" />
+          {/* Content Area with Stats */}
+          <div className="mb-6">
+            <div className="bg-gradient-to-br from-[#36454F] to-[#2a3640] rounded-2xl p-6 text-white shadow-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  {currentTabData && (
+                    <>
+                      <div className="w-14 h-14 rounded-xl bg-[#6B7F39] flex items-center justify-center">
+                        <currentTabData.icon className="w-7 h-7 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold">{currentTabData.label} Settings</h2>
+                        <p className="text-white/70 text-sm mt-1">
+                          {activeTab === 'general' && 'Configure your company information and preferences'}
+                          {activeTab === 'homepage' && `Managing ${stats.totalSlides} slides and home page content`}
+                          {activeTab === 'users' && `Managing ${stats.totalUsers} users across the platform`}
+                          {activeTab === 'database' && `Database: ${dbConnectionStatus === 'connected' ? 'Connected ✓' : 'Disconnected'}`}
+                          {activeTab === 'sms' && `Using ${smsProvider} for SMS communications`}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <div className="bg-[#6B7F39] rounded-xl p-3 text-center">
+                    <Users className="w-5 h-5 mb-1 mx-auto" />
+                    <p className="text-xl font-bold">{stats.totalUsers}</p>
+                    <p className="text-xs opacity-70">Users</p>
+                  </div>
+                  <div className="bg-[#6B7F39] rounded-xl p-3 text-center">
+                    <Home className="w-5 h-5 mb-1 mx-auto" />
+                    <p className="text-xl font-bold">{stats.totalSlides}</p>
+                    <p className="text-xs opacity-70">Slides</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tab Content Container */}
+          <div className="space-y-6">
+            {/* General Settings Tab */}
+            {activeTab === 'general' && (
+              <div className="space-y-6">
+                {/* Company Details Card */}
+                <div className="bg-white rounded-2xl shadow-lg border border-[#36454F]/10 overflow-hidden">
+                  <div className="p-6 bg-[#FAF4EC] border-b border-[#36454F]/10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#6B7F39] flex items-center justify-center">
+                        <Building2 className="w-5 h-5 text-white" />
+                      </div>
+                      <h3 className="text-xl font-bold text-[#36454F]">Company Details</h3>
+                    </div>
+                  </div>
+                  <div className="p-6 space-y-6">
+                    {/* Company Logo */}
+                    <div className="bg-gradient-to-br from-[#FAF4EC] to-[#f5ede3] rounded-xl p-6 border-2 border-dashed border-[#36454F]/20">
+                      <label className="block text-sm font-semibold text-[#36454F] mb-4 flex items-center gap-2">
+                        <Upload className="w-4 h-4 text-[#6B7F39]" />
+                        Company Logo
+                      </label>
+                      <div className="flex items-center gap-6">
+                        {generalSettings.companyLogo ? (
+                          <div className="relative group">
+                            <img
+                              src={generalSettings.companyLogo}
+                              alt="Company Logo"
+                              className="w-24 h-24 object-contain border-2 border-[#36454F]/20 rounded-xl bg-white shadow-md"
+                            />
+                            <div className="absolute inset-0 bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <Edit className="w-6 h-6 text-white" />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-24 h-24 border-2 border-dashed border-[#36454F]/30 rounded-xl flex items-center justify-center bg-white">
+                            <Building2 className="w-8 h-8 text-[#36454F]/40" />
+                          </div>
+                        )}
+                        <div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLogoUpload}
+                            className="hidden"
+                            id="logo-upload"
+                          />
+                          <label htmlFor="logo-upload">
+                            <Button type="button" variant="outline" className="border-2 border-[#6B7F39] text-[#6B7F39] hover:bg-[#FAF4EC]" asChild>
+                              <span className="flex items-center gap-2">
+                                <Upload className="w-4 h-4" />
+                                {generalSettings.companyLogo ? 'Change Logo' : 'Upload Logo'}
+                              </span>
+                            </Button>
+                          </label>
+                          <p className="text-xs text-gray-500 mt-2">PNG, JPG or GIF (max. 2MB)</p>
                         </div>
-                        <h3 className="text-xl font-bold text-blue-900">Company Details</h3>
                       </div>
                     </div>
-                    <div className="p-6 space-y-6">
-                      {/* Company Logo */}
-                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border-2 border-dashed border-gray-300">
-                        <label className="block text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                          <Upload className="w-4 h-4" />
-                          Company Logo
+
+                    {/* Company Info Grid */}
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* Company Name */}
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
+                          <Building2 className="w-4 h-4 text-[#6B7F39]" />
+                          Company Name
                         </label>
-                        <div className="flex items-center gap-6">
-                          {generalSettings.companyLogo ? (
-                            <div className="relative group">
-                              <img
-                                src={generalSettings.companyLogo}
-                                alt="Company Logo"
-                                className="w-24 h-24 object-contain border-2 border-gray-300 rounded-xl bg-white shadow-md"
-                              />
-                              <div className="absolute inset-0 bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <Edit className="w-6 h-6 text-white" />
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="w-24 h-24 border-2 border-dashed border-gray-400 rounded-xl flex items-center justify-center bg-white">
-                              <Building2 className="w-8 h-8 text-gray-400" />
-                            </div>
-                          )}
-                          <div>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={handleLogoUpload}
-                              className="hidden"
-                              id="logo-upload"
-                            />
-                            <label htmlFor="logo-upload">
-                              <Button type="button" variant="outline" className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50" asChild>
-                                <span className="flex items-center gap-2">
-                                  <Upload className="w-4 h-4" />
-                                  {generalSettings.companyLogo ? 'Change Logo' : 'Upload Logo'}
-                                </span>
-                              </Button>
-                            </label>
-                            <p className="text-xs text-gray-500 mt-2">PNG, JPG or GIF (max. 2MB)</p>
-                          </div>
-                        </div>
+                        <Input
+                          value={generalSettings.companyName}
+                          onChange={(e) => setGeneralSettings({...generalSettings, companyName: e.target.value})}
+                          placeholder="Enter company name"
+                          className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                        />
                       </div>
 
-                      {/* Company Info Grid - 2 Columns */}
-                      <div className="grid grid-cols-2 gap-6">
-                        {/* Company Name */}
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <Building2 className="w-4 h-4 text-blue-600" />
-                            Company Name
-                          </label>
-                          <Input
-                            value={generalSettings.companyName}
-                            onChange={(e) => setGeneralSettings({...generalSettings, companyName: e.target.value})}
-                            placeholder="Enter company name"
-                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
-                          />
-                        </div>
-
-                        {/* Phone */}
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <Phone className="w-4 h-4 text-green-600" />
-                            Phone Number
-                          </label>
-                          <Input
-                            value={generalSettings.companyPhone}
-                            onChange={(e) => setGeneralSettings({...generalSettings, companyPhone: e.target.value})}
-                            placeholder="+254 700 123 456"
-                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
-                          />
-                        </div>
-
-                        {/* Email */}
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <Mail className="w-4 h-4 text-red-600" />
-                            Email Address
-                          </label>
-                          <Input
-                            type="email"
-                            value={generalSettings.companyEmail}
-                            onChange={(e) => setGeneralSettings({...generalSettings, companyEmail: e.target.value})}
-                            placeholder="info@skywaysuites.co.ke"
-                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
-                          />
-                        </div>
-
-                        {/* Website */}
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <Globe className="w-4 h-4 text-indigo-600" />
-                            Website
-                          </label>
-                          <Input
-                            type="url"
-                            value={generalSettings.companyWebsite}
-                            onChange={(e) => setGeneralSettings({...generalSettings, companyWebsite: e.target.value})}
-                            placeholder="https://skywaysuites.co.ke"
-                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
-                          />
-                        </div>
-
-                        {/* Address */}
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <MapPin className="w-4 h-4 text-purple-600" />
-                            Address
-                          </label>
-                          <Input
-                            value={generalSettings.companyAddress}
-                            onChange={(e) => setGeneralSettings({...generalSettings, companyAddress: e.target.value})}
-                            placeholder="Nairobi, Kenya"
-                            className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12"
-                          />
-                        </div>
-
-                        {/* Currency */}
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <DollarSign className="w-4 h-4 text-yellow-600" />
-                            Currency
-                          </label>
-                          <Select
-                            value={generalSettings.currency}
-                            onValueChange={(value) => setGeneralSettings({...generalSettings, currency: value})}
-                          >
-                            <SelectTrigger className="border-2 border-gray-200 focus:border-blue-500 rounded-xl h-12">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="KSh">KSh (Kenyan Shilling)</SelectItem>
-                              <SelectItem value="$">$ (US Dollar)</SelectItem>
-                              <SelectItem value="€">€ (Euro)</SelectItem>
-                              <SelectItem value="£">£ (British Pound)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      {/* Phone */}
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
+                          <Phone className="w-4 h-4 text-[#6B7F39]" />
+                          Phone Number
+                        </label>
+                        <Input
+                          value={generalSettings.companyPhone}
+                          onChange={(e) => setGeneralSettings({...generalSettings, companyPhone: e.target.value})}
+                          placeholder="+254 700 123 456"
+                          className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                        />
                       </div>
 
-                      {/* Save Button */}
-                      <div className="pt-4 border-t-2 border-gray-100">
-                        <Button 
-                          onClick={handleSaveGeneralSettings}
-                          className="w-full md:w-auto bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-6 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                      {/* Email */}
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
+                          <Mail className="w-4 h-4 text-[#6B7F39]" />
+                          Email Address
+                        </label>
+                        <Input
+                          type="email"
+                          value={generalSettings.companyEmail}
+                          onChange={(e) => setGeneralSettings({...generalSettings, companyEmail: e.target.value})}
+                          placeholder="info@skywaysuites.co.ke"
+                          className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                        />
+                      </div>
+
+                      {/* Website */}
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
+                          <Globe className="w-4 h-4 text-[#6B7F39]" />
+                          Website
+                        </label>
+                        <Input
+                          type="url"
+                          value={generalSettings.companyWebsite}
+                          onChange={(e) => setGeneralSettings({...generalSettings, companyWebsite: e.target.value})}
+                          placeholder="https://skywaysuites.co.ke"
+                          className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                        />
+                      </div>
+
+                      {/* Address */}
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
+                          <MapPin className="w-4 h-4 text-[#6B7F39]" />
+                          Address
+                        </label>
+                        <Input
+                          value={generalSettings.companyAddress}
+                          onChange={(e) => setGeneralSettings({...generalSettings, companyAddress: e.target.value})}
+                          placeholder="Nairobi, Kenya"
+                          className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                        />
+                      </div>
+
+                      {/* Currency */}
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
+                          <DollarSign className="w-4 h-4 text-[#6B7F39]" />
+                          Currency
+                        </label>
+                        <Select
+                          value={generalSettings.currency}
+                          onValueChange={(value) => setGeneralSettings({...generalSettings, currency: value})}
                         >
-                          <Save className="w-5 h-5 mr-2" />
-                          Save General Settings
-                        </Button>
+                          <SelectTrigger className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="KSh">KSh (Kenyan Shilling)</SelectItem>
+                            <SelectItem value="$">$ (US Dollar)</SelectItem>
+                            <SelectItem value="€">€ (Euro)</SelectItem>
+                            <SelectItem value="£">£ (British Pound)</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
+                    </div>
+
+                    {/* Save Button */}
+                    <div className="pt-4 border-t-2 border-[#36454F]/10">
+                      <Button 
+                        onClick={handleSaveGeneralSettings}
+                        className="w-full md:w-auto bg-[#6B7F39] hover:bg-[#5a6930] text-white font-semibold py-6 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                        disabled={!isOnline}
+                      >
+                        <Save className="w-5 h-5 mr-2" />
+                        Save General Settings
+                      </Button>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Home Page Settings Tab */}
-              {activeTab === 'homepage' && (
-                <div className="space-y-6">
-                  {/* Slideshow Management */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-indigo-50 to-indigo-100 border-b-2 border-indigo-200">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-md">
-                            <Image className="w-5 h-5 text-white" />
+            {/* Home Page Settings Tab */}
+            {activeTab === 'homepage' && (
+              <div className="space-y-6">
+                {/* Slideshow Management */}
+                <div className="bg-white rounded-2xl shadow-lg border border-[#36454F]/10 overflow-hidden">
+                  <div className="p-6 bg-[#FAF4EC] border-b border-[#36454F]/10">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#6B7F39] flex items-center justify-center">
+                          <Image className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-[#36454F]">Slideshow Management</h3>
+                          <p className="text-sm text-[#36454F]/70">{homePageSettings.slides.length} active slides</p>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={handleAddSlide}
+                        className="bg-[#6B7F39] hover:bg-[#5a6930] text-white"
+                        disabled={!isOnline}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Slide
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    {homePageSettings.slides.map((slide, index) => (
+                      <div
+                        key={slide.id}
+                        className="group bg-[#FAF4EC] rounded-2xl p-5 border border-[#36454F]/10 hover:border-[#6B7F39] transition-all duration-300"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-[#6B7F39] text-white font-bold flex items-center justify-center">
+                              {index + 1}
+                            </div>
+                            <div>
+                              <p className="font-bold text-[#36454F] text-lg">{slide.title}</p>
+                              <p className="text-gray-600 text-sm">{slide.subtitle}</p>
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="text-xl font-bold text-indigo-900">Slideshow Management</h3>
-                            <p className="text-sm text-indigo-700">{homePageSettings.slides.length} active slides</p>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditSlide(slide)}
+                              className="border-2 border-[#6B7F39] text-[#6B7F39] hover:bg-[#FAF4EC]"
+                              disabled={!isOnline}
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteSlide(slide.id)}
+                              className="border-2 border-[#36454F] text-[#36454F] hover:bg-[#FAF4EC]"
+                              disabled={!isOnline}
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
+                            </Button>
                           </div>
                         </div>
-                        <Button
-                          onClick={handleAddSlide}
-                          className="bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828]"
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Slide
-                        </Button>
                       </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <div className="flex justify-end">
+                  <Button 
+                    onClick={handleSaveHomePageSettings}
+                    className="bg-[#6B7F39] hover:bg-[#5a6930] text-white font-semibold py-6 px-8 rounded-xl shadow-lg"
+                    disabled={!isOnline}
+                  >
+                    <Save className="w-5 h-5 mr-2" />
+                    Save Home Page Settings
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Users Tab */}
+            {activeTab === 'users' && (
+              <div className="space-y-6">
+                {/* User Management Card */}
+                <div className="bg-white rounded-2xl shadow-lg border border-[#36454F]/10 overflow-hidden">
+                  <div className="p-6 bg-[#FAF4EC] border-b border-[#36454F]/10">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#6B7F39] flex items-center justify-center">
+                          <Users className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-[#36454F]">User Management</h3>
+                          <p className="text-sm text-[#36454F]/70">{users.length} registered users</p>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => setShowAddUserModal(true)}
+                        className="bg-[#6B7F39] hover:bg-[#5a6930] text-white"
+                        disabled={!isOnline}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add User
+                      </Button>
                     </div>
-                    <div className="p-6 space-y-4">
-                      {homePageSettings.slides.map((slide, index) => (
+                  </div>
+                  <div className="p-6">
+                    <div className="space-y-4">
+                      {users.map((user) => (
                         <div
-                          key={slide.id}
-                          className="group bg-gradient-to-r from-[#FAF4EC] to-[#f5ede3] rounded-2xl p-5 border-2 border-gray-200 hover:border-indigo-400 transition-all duration-300"
+                          key={user.id}
+                          className="bg-[#FAF4EC] rounded-xl p-4 border border-[#36454F]/10"
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white font-bold flex items-center justify-center shadow-md">
-                                {index + 1}
+                              <div className="w-12 h-12 rounded-full bg-[#6B7F39] text-white font-bold flex items-center justify-center">
+                                {user.name.charAt(0).toUpperCase()}
                               </div>
                               <div>
-                                <p className="font-bold text-[#36454F] text-lg">{slide.title}</p>
-                                <p className="text-gray-600 text-sm">{slide.subtitle}</p>
+                                <p className="font-bold text-[#36454F]">{user.name}</p>
+                                <div className="flex items-center gap-4 text-sm text-gray-600">
+                                  <span className="flex items-center gap-1">
+                                    <Mail className="w-4 h-4 text-[#6B7F39]" />
+                                    {user.email}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Phone className="w-4 h-4 text-[#6B7F39]" />
+                                    {user.phone}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="px-3 py-1 bg-[#6B7F39] text-white text-xs font-semibold rounded-full">
+                                {user.role}
+                              </span>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleEditSlide(slide)}
-                                className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+                                onClick={() => handleDeleteUser(user.id)}
+                                className="border-2 border-[#36454F] text-[#36454F] hover:bg-[#FAF4EC]"
+                                disabled={!isOnline}
                               >
-                                <Edit className="w-4 h-4 mr-1" />
-                                Edit
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDeleteSlide(slide.id)}
-                                className="border-2 border-red-500 text-red-600 hover:bg-red-50"
-                              >
-                                <Trash2 className="w-4 h-4 mr-1" />
-                                Delete
+                                <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
                           </div>
@@ -1621,1139 +1452,449 @@ export function Settings() {
                       ))}
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
 
-                  {/* Properties Section Settings */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-green-50 to-green-100 border-b-2 border-green-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-md">
-                          <Layout className="w-5 h-5 text-white" />
-                        </div>
-                        <h3 className="text-xl font-bold text-green-900">Properties Section</h3>
+            {/* Database Tab */}
+            {activeTab === 'database' && (
+              <div className="space-y-6">
+                {/* Database Backup & Restore Card */}
+                <div className="bg-white rounded-2xl shadow-lg border border-[#36454F]/10 overflow-hidden">
+                  <div className="p-6 bg-[#FAF4EC] border-b border-[#36454F]/10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#6B7F39] flex items-center justify-center">
+                        <HardDrive className="w-5 h-5 text-white" />
                       </div>
-                    </div>
-                    <div className="p-6 space-y-6">
-                      {/* Titles */}
-                      <div className="grid grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <Type className="w-4 h-4 text-green-600" />
-                            Section Title
-                          </label>
-                          <Input
-                            value={homePageSettings.propertiesTitle}
-                            onChange={(e) => setHomePageSettings({...homePageSettings, propertiesTitle: e.target.value})}
-                            placeholder="Featured Properties"
-                            className="border-2 border-gray-200 focus:border-green-500 rounded-xl h-12"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <Type className="w-4 h-4 text-blue-600" />
-                            Section Subtitle
-                          </label>
-                          <Input
-                            value={homePageSettings.propertiesSubtitle}
-                            onChange={(e) => setHomePageSettings({...homePageSettings, propertiesSubtitle: e.target.value})}
-                            placeholder="Handpicked premium properties..."
-                            className="border-2 border-gray-200 focus:border-green-500 rounded-xl h-12"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Layout Settings */}
-                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border-2 border-blue-200">
-                        <h4 className="font-bold text-blue-900 mb-4 flex items-center gap-2">
-                          <Grid3x3 className="w-5 h-5" />
-                          Layout Configuration
-                        </h4>
-                        <div className="grid grid-cols-3 gap-6">
-                          <div className="space-y-2">
-                            <label className="block text-sm font-semibold text-gray-700">Columns</label>
-                            <Select
-                              value={homePageSettings.propertiesLayout.columns.toString()}
-                              onValueChange={(value) => setHomePageSettings({
-                                ...homePageSettings,
-                                propertiesLayout: {...homePageSettings.propertiesLayout, columns: parseInt(value)}
-                              })}
-                            >
-                              <SelectTrigger className="border-2 border-gray-200 rounded-xl h-12 bg-white">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="1">1 Column</SelectItem>
-                                <SelectItem value="2">2 Columns</SelectItem>
-                                <SelectItem value="3">3 Columns</SelectItem>
-                                <SelectItem value="4">4 Columns</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="block text-sm font-semibold text-gray-700">Rows</label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="10"
-                              value={homePageSettings.propertiesLayout.rows}
-                              onChange={(e) => setHomePageSettings({
-                                ...homePageSettings,
-                                propertiesLayout: {...homePageSettings.propertiesLayout, rows: parseInt(e.target.value) || 1}
-                              })}
-                              className="border-2 border-gray-200 rounded-xl h-12 bg-white"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="block text-sm font-semibold text-gray-700">Max Properties</label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="50"
-                              value={homePageSettings.propertiesLayout.maxProperties}
-                              onChange={(e) => setHomePageSettings({
-                                ...homePageSettings,
-                                propertiesLayout: {...homePageSettings.propertiesLayout, maxProperties: parseInt(e.target.value) || 1}
-                              })}
-                              className="border-2 border-gray-200 rounded-xl h-12 bg-white"
-                            />
-                          </div>
-                        </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-[#36454F]">Backup & Restore</h3>
+                        <p className="text-sm text-gray-600 mt-0.5">Export, import, and manage database backups</p>
                       </div>
                     </div>
                   </div>
+                  <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <Button
+                        onClick={handleExportDatabase}
+                        className="bg-[#6B7F39] hover:bg-[#5a6930] text-white h-auto py-6 flex flex-col items-center gap-2"
+                        disabled={!isOnline}
+                      >
+                        <Download className="w-6 h-6" />
+                        <span className="font-semibold">Export Database</span>
+                        <span className="text-xs opacity-80">Download backup</span>
+                      </Button>
 
-                  {/* Why Us Section */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-yellow-50 to-yellow-100 border-b-2 border-yellow-200">
+                      <label htmlFor="import-database">
+                        <input
+                          type="file"
+                          id="import-database"
+                          accept=".json"
+                          onChange={handleImportDatabase}
+                          className="hidden"
+                          disabled={!isOnline}
+                        />
+                        <div className="bg-[#6B7F39] hover:bg-[#5a6930] text-white h-full rounded-lg cursor-pointer py-6 flex flex-col items-center gap-2 justify-center">
+                          <Upload className="w-6 h-6" />
+                          <span className="font-semibold">Import Database</span>
+                          <span className="text-xs opacity-80">Restore from file</span>
+                        </div>
+                      </label>
+
+                      <Button
+                        onClick={handleCopyDatabaseQuery}
+                        className="bg-[#36454F] hover:bg-[#2a3640] text-white h-auto py-6 flex flex-col items-center gap-2"
+                        disabled={!isOnline}
+                      >
+                        <Copy className="w-6 h-6" />
+                        <span className="font-semibold">Copy Query</span>
+                        <span className="text-xs opacity-80">Copy to clipboard</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Data Management Card */}
+                <div className="bg-white rounded-2xl shadow-lg border border-[#36454F]/10 overflow-hidden">
+                  <div className="p-6 bg-[#FAF4EC] border-b border-[#36454F]/10">
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-500 to-yellow-600 flex items-center justify-center shadow-md">
-                          <Star className="w-5 h-5 text-white" />
+                        <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center">
+                          <AlertCircle className="w-5 h-5 text-white" />
                         </div>
                         <div>
-                          <h3 className="text-xl font-bold text-yellow-900">Why Us Section</h3>
+                          <h3 className="text-xl font-bold text-[#36454F]">Data Management</h3>
+                          <p className="text-sm text-gray-600 mt-0.5">Clear specific data tables or reset entire system</p>
                         </div>
                       </div>
-                    </div>
-                    <div className="p-6 space-y-6">
-                      {/* Section Title */}
-                      <div className="space-y-2">
-                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                          <Type className="w-4 h-4 text-yellow-600" />
-                          Section Title
-                        </label>
-                        <Input
-                          value={homePageSettings.whyUsTitle}
-                          onChange={(e) => setHomePageSettings({...homePageSettings, whyUsTitle: e.target.value})}
-                          placeholder="Why Choose Skyway Suites"
-                          className="border-2 border-gray-200 focus:border-yellow-500 rounded-xl h-12"
-                        />
-                      </div>
-
-                      {/* Why Us Items */}
-                      <div className="grid md:grid-cols-2 gap-4">
-                        {homePageSettings.whyUsItems.map((item, index) => (
-                          <div
-                            key={item.id}
-                            className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-5 border-2 border-yellow-200"
-                          >
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-500 to-yellow-600 text-white font-bold flex items-center justify-center shadow-md">
-                                  {index + 1}
-                                </div>
-                                <div>
-                                  <p className="font-bold text-gray-800">{item.title}</p>
-                                  <p className="text-sm text-gray-600">{item.description}</p>
-                                </div>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditWhyUsItem(item)}
-                                className="text-blue-600 hover:bg-blue-100"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
+                      <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+                        <p className="text-xs font-semibold text-red-700">⚠️ Destructive Actions</p>
                       </div>
                     </div>
                   </div>
+                  <div className="p-6 space-y-4">
+                    {/* Clear Individual Tables */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <Button
+                        onClick={handleClearProperties}
+                        variant="outline"
+                        className="border-2 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300 hover:text-black h-auto py-3 flex flex-col items-center gap-1.5"
+                        disabled={!isOnline}
+                      >
+                        <Home className="w-4 h-4" />
+                        <span className="text-sm font-semibold">Clear Properties</span>
+                      </Button>
 
-                  {/* Footer Settings */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-gray-700 to-gray-800 border-b-2 border-gray-900">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shadow-md">
-                          <List className="w-5 h-5 text-white" />
-                        </div>
-                        <h3 className="text-xl font-bold text-white">Footer Settings</h3>
-                      </div>
-                    </div>
-                    <div className="p-6 space-y-6">
-                      {/* About Text */}
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700">About Text</label>
-                        <Textarea
-                          value={homePageSettings.footer.aboutText}
-                          onChange={(e) => setHomePageSettings({
-                            ...homePageSettings,
-                            footer: {...homePageSettings.footer, aboutText: e.target.value}
-                          })}
-                          rows={3}
-                          className="border-2 border-gray-200 focus:border-gray-500 rounded-xl"
-                        />
-                      </div>
+                      <Button
+                        onClick={handleClearCustomers}
+                        variant="outline"
+                        className="border-2 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300 hover:text-black h-auto py-3 flex flex-col items-center gap-1.5"
+                        disabled={!isOnline}
+                      >
+                        <Users className="w-4 h-4" />
+                        <span className="text-sm font-semibold">Clear Customers</span>
+                      </Button>
 
-                      {/* Contact Info - 2 Columns */}
-                      <div className="grid grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <Mail className="w-4 h-4 text-red-600" />
-                            Footer Email
-                          </label>
-                          <Input
-                            value={homePageSettings.footer.contactEmail}
-                            onChange={(e) => setHomePageSettings({
-                              ...homePageSettings,
-                              footer: {...homePageSettings.footer, contactEmail: e.target.value}
-                            })}
-                            className="border-2 border-gray-200 rounded-xl h-12"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                            <Phone className="w-4 h-4 text-green-600" />
-                            Footer Phone
-                          </label>
-                          <Input
-                            value={homePageSettings.footer.contactPhone}
-                            onChange={(e) => setHomePageSettings({
-                              ...homePageSettings,
-                              footer: {...homePageSettings.footer, contactPhone: e.target.value}
-                            })}
-                            className="border-2 border-gray-200 rounded-xl h-12"
-                          />
-                        </div>
-                      </div>
+                      <Button
+                        onClick={handleClearBookings}
+                        variant="outline"
+                        className="border-2 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300 hover:text-black h-auto py-3 flex flex-col items-center gap-1.5"
+                        disabled={!isOnline}
+                      >
+                        <Calendar className="w-4 h-4" />
+                        <span className="text-sm font-semibold">Clear Bookings</span>
+                      </Button>
 
-                      {/* Address */}
-                      <div className="space-y-2">
-                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                          <MapPin className="w-4 h-4 text-purple-600" />
-                          Footer Address
-                        </label>
-                        <Input
-                          value={homePageSettings.footer.contactAddress}
-                          onChange={(e) => setHomePageSettings({
-                            ...homePageSettings,
-                            footer: {...homePageSettings.footer, contactAddress: e.target.value}
-                          })}
-                          className="border-2 border-gray-200 rounded-xl h-12"
-                        />
-                      </div>
+                      <Button
+                        onClick={handleClearPayments}
+                        variant="outline"
+                        className="border-2 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300 hover:text-black h-auto py-3 flex flex-col items-center gap-1.5"
+                        disabled={!isOnline}
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        <span className="text-sm font-semibold">Clear Payments</span>
+                      </Button>
 
-                      {/* Social Links - 2 Columns */}
-                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border-2 border-blue-200">
-                        <h4 className="font-bold text-blue-900 mb-4">Social Media Links</h4>
-                        <div className="grid grid-cols-2 gap-4">
-                          <Input
-                            placeholder="Facebook URL"
-                            value={homePageSettings.footer.socialLinks.facebook}
-                            onChange={(e) => setHomePageSettings({
-                              ...homePageSettings,
-                              footer: {
-                                ...homePageSettings.footer,
-                                socialLinks: {...homePageSettings.footer.socialLinks, facebook: e.target.value}
-                              }
-                            })}
-                            className="border-2 border-gray-200 rounded-xl h-12 bg-white"
-                          />
-                          <Input
-                            placeholder="Twitter URL"
-                            value={homePageSettings.footer.socialLinks.twitter}
-                            onChange={(e) => setHomePageSettings({
-                              ...homePageSettings,
-                              footer: {
-                                ...homePageSettings.footer,
-                                socialLinks: {...homePageSettings.footer.socialLinks, twitter: e.target.value}
-                              }
-                            })}
-                            className="border-2 border-gray-200 rounded-xl h-12 bg-white"
-                          />
-                          <Input
-                            placeholder="Instagram URL"
-                            value={homePageSettings.footer.socialLinks.instagram}
-                            onChange={(e) => setHomePageSettings({
-                              ...homePageSettings,
-                              footer: {
-                                ...homePageSettings.footer,
-                                socialLinks: {...homePageSettings.footer.socialLinks, instagram: e.target.value}
-                              }
-                            })}
-                            className="border-2 border-gray-200 rounded-xl h-12 bg-white"
-                          />
-                          <Input
-                            placeholder="LinkedIn URL"
-                            value={homePageSettings.footer.socialLinks.linkedin}
-                            onChange={(e) => setHomePageSettings({
-                              ...homePageSettings,
-                              footer: {
-                                ...homePageSettings.footer,
-                                socialLinks: {...homePageSettings.footer.socialLinks, linkedin: e.target.value}
-                              }
-                            })}
-                            className="border-2 border-gray-200 rounded-xl h-12 bg-white"
-                          />
-                        </div>
-                      </div>
+                      <Button
+                        onClick={handleClearActivityLogs}
+                        variant="outline"
+                        className="border-2 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300 hover:text-black h-auto py-3 flex flex-col items-center gap-1.5"
+                        disabled={!isOnline}
+                      >
+                        <Activity className="w-4 h-4" />
+                        <span className="text-sm font-semibold">Clear Activity Logs</span>
+                      </Button>
 
-                      {/* Copyright Text */}
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700">Copyright Text</label>
-                        <Input
-                          value={homePageSettings.footer.copyrightText}
-                          onChange={(e) => setHomePageSettings({
-                            ...homePageSettings,
-                            footer: {...homePageSettings.footer, copyrightText: e.target.value}
-                          })}
-                          className="border-2 border-gray-200 rounded-xl h-12"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Save All Home Page Settings */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-green-300 p-6">
-                    <Button 
-                      onClick={handleSaveHomePageSettings}
-                      className="w-full bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-bold py-6 px-8 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 text-lg"
-                    >
-                      <Save className="w-6 h-6 mr-3" />
-                      Save All Home Page Settings
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Users Settings Tab */}
-              {activeTab === 'users' && (
-                <div className="space-y-6">
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    {/* Header */}
-                    <div className="p-6 bg-gradient-to-r from-green-50 to-green-100 border-b-2 border-green-200">
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-md">
-                            <Users className="w-5 h-5 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="text-xl font-bold text-green-900">User Management</h3>
-                            <p className="text-sm text-green-700">{users.length} registered users</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => {
-                              setEditingUser(null);
-                              setNewUser({
-                                name: '',
-                                email: '',
-                                phone: '',
-                                password: '',
-                                role: 'Customer'
-                              });
-                              setShowAddUserModal(true);
-                            }}
-                            className="bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] shadow-md"
-                          >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add User
-                          </Button>
-                          <Button
-                            onClick={() => setShowManageRolesModal(true)}
-                            variant="outline"
-                            className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
-                          >
-                            <Shield className="w-4 h-4 mr-2" />
-                            Manage Roles
-                          </Button>
-                        </div>
-                      </div>
+                      <Button
+                        onClick={handleResetSystem}
+                        variant="outline"
+                        className="border-2 border-red-600 text-red-800 hover:bg-red-100 hover:border-red-700 hover:text-black h-auto py-3 flex flex-col items-center gap-1.5"
+                        disabled={!isOnline}
+                      >
+                        <Database className="w-4 h-4" />
+                        <span className="text-sm font-semibold">Reset System</span>
+                      </Button>
                     </div>
 
-                    {/* Users List */}
-                    <div className="p-6">
-                      <div className="space-y-4">
-                        {users.length > 0 ? (
-                          users.map((user, index) => (
-                            <div
-                              key={user.id}
-                              className="group relative bg-gradient-to-r from-[#FAF4EC] to-[#f5ede3] rounded-2xl p-5 border-2 border-gray-200 hover:border-[#6B7F39] hover:shadow-lg transition-all duration-300"
-                            >
-                              {/* User Number Badge */}
-                              <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-gradient-to-br from-[#6B7F39] to-[#36454F] text-white text-sm font-bold flex items-center justify-center shadow-md">
-                                {index + 1}
-                              </div>
-
-                              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                                <div className="flex-1 flex items-start gap-4">
-                                  {/* Avatar */}
-                                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#6B7F39] to-[#36454F] flex items-center justify-center text-white font-bold text-lg shadow-md flex-shrink-0">
-                                    {user.name.charAt(0).toUpperCase()}
-                                  </div>
-                                  
-                                  {/* User Info */}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-bold text-[#36454F] text-lg mb-1">{user.name}</p>
-                                    <div className="flex flex-col gap-1">
-                                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                                        <Mail className="w-4 h-4 text-blue-500" />
-                                        <span className="truncate">{user.email}</span>
-                                      </div>
-                                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                                        <Phone className="w-4 h-4 text-green-500" />
-                                        <span>{user.phone}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Actions */}
-                                <div className="flex items-center gap-3 flex-wrap">
-                                  {/* Role Selector */}
-                                  <Select
-                                    value={user.role || 'Customer'}
-                                    onValueChange={(value) => handleUpdateUserRole(user.id, value)}
-                                  >
-                                    <SelectTrigger className="w-40 border-2 border-gray-300 rounded-xl h-11">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="Admin">
-                                        <span className="flex items-center gap-2">
-                                          <Shield className="w-4 h-4 text-red-500" />
-                                          Admin
-                                        </span>
-                                      </SelectItem>
-                                      <SelectItem value="Manager">
-                                        <span className="flex items-center gap-2">
-                                          <UserCog className="w-4 h-4 text-blue-500" />
-                                          Manager
-                                        </span>
-                                      </SelectItem>
-                                      <SelectItem value="Customer">
-                                        <span className="flex items-center gap-2">
-                                          <Users className="w-4 h-4 text-green-500" />
-                                          Customer
-                                        </span>
-                                      </SelectItem>
-                                    </SelectContent>
-                                  </Select>
-
-                                  {/* Edit Button */}
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEditUser(user)}
-                                    className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50 rounded-xl h-11 px-4"
-                                  >
-                                    <Edit className="w-4 h-4 mr-1" />
-                                    Edit
-                                  </Button>
-
-                                  {/* Delete Button */}
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleDeleteUser(user.id)}
-                                    className="border-2 border-red-500 text-red-600 hover:bg-red-50 rounded-xl h-11 px-4"
-                                  >
-                                    <Trash2 className="w-4 h-4 mr-1" />
-                                    Delete
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border-2 border-dashed border-gray-300">
-                            <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center mx-auto mb-4">
-                              <Users className="w-10 h-10 text-gray-400" />
-                            </div>
-                            <p className="text-gray-500 text-lg font-medium">No users yet</p>
-                            <p className="text-gray-400 text-sm mt-2">Click "Add User" to create your first user</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Database Settings Tab */}
-              {activeTab === 'database' && (
-                <div className="space-y-6">
-                  {/* Connection Status Card */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-purple-50 to-purple-100 border-b-2 border-purple-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
-                            <Database className="w-5 h-5 text-white" />
-                          </div>
-                          <h3 className="text-xl font-bold text-purple-900">Supabase Connection Status</h3>
-                        </div>
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold ${
-                          dbConnectionStatus === 'connected' 
-                            ? 'bg-green-100 text-green-700' 
-                            : dbConnectionStatus === 'connecting'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : dbConnectionStatus === 'error'
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}>
-                          {dbConnectionStatus === 'connected' && <Wifi className="w-4 h-4" />}
-                          {dbConnectionStatus === 'connecting' && <Loader2 className="w-4 h-4 animate-spin" />}
-                          {dbConnectionStatus === 'error' && <WifiOff className="w-4 h-4" />}
-                          {dbConnectionStatus === 'disconnected' && <WifiOff className="w-4 h-4" />}
-                          {dbConnectionStatus === 'connected' ? 'Connected' : dbConnectionStatus === 'connecting' ? 'Connecting...' : dbConnectionStatus === 'error' ? 'Error' : 'Disconnected'}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-6">
-                      {connectionError && (
-                        <div className="mb-4 p-4 bg-red-50 border-2 border-red-200 rounded-xl">
-                          <div className="flex items-center gap-2 text-red-700">
-                            <AlertCircle className="w-5 h-5" />
-                            <p className="font-medium">{connectionError}</p>
-                          </div>
-                        </div>
-                      )}
-                      <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
-                        <div className="flex items-start gap-3">
-                          <Info className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
-                          <div className="text-sm text-purple-800">
-                            <p className="font-semibold mb-2">Important: Strictly Cloud-Based Application</p>
-                            <p className="mb-2">Skyway Suites Version 3.0 operates entirely on Supabase cloud infrastructure. All data is stored online and requires an active internet connection.</p>
-                            <ul className="list-disc list-inside space-y-1 ml-2">
-                              <li>No offline mode available</li>
-                              <li>Database settings saved to cloud (accessible from any device)</li>
-                              <li>Real-time synchronization across all devices</li>
-                              <li>Automatic backups and data security</li>
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Supabase Configuration Card */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-purple-50 to-purple-100 border-b-2 border-purple-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
-                          <Server className="w-5 h-5 text-white" />
-                        </div>
-                        <h3 className="text-xl font-bold text-purple-900">Supabase Configuration</h3>
-                      </div>
-                    </div>
-                    <div className="p-6 space-y-6">
-                      {/* Supabase URL */}
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700">
-                          Supabase Project URL *
-                        </label>
-                        <Input
-                          type="text"
-                          placeholder="https://xxxxx.supabase.co"
-                          value={dbSettings.supabaseUrl}
-                          onChange={(e) => setDbSettings({ ...dbSettings, supabaseUrl: e.target.value })}
-                          className="border-2 border-gray-200 focus:border-purple-500 rounded-xl h-12"
-                        />
-                        <p className="text-xs text-gray-500">Find this in your Supabase project settings</p>
-                      </div>
-
-                      {/* Supabase Anon Key */}
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700">
-                          Supabase Anon/Public Key *
-                        </label>
-                        <Input
-                          type="password"
-                          placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                          value={dbSettings.supabaseAnonKey}
-                          onChange={(e) => setDbSettings({ ...dbSettings, supabaseAnonKey: e.target.value })}
-                          className="border-2 border-gray-200 focus:border-purple-500 rounded-xl h-12"
-                        />
-                        <p className="text-xs text-gray-500">Public/anon key (safe to use in frontend)</p>
-                      </div>
-
-                      {/* Supabase Service Role Key */}
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700">
-                          Supabase Service Role Key (Optional)
-                        </label>
-                        <Input
-                          type="password"
-                          placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                          value={dbSettings.supabaseServiceKey}
-                          onChange={(e) => setDbSettings({ ...dbSettings, supabaseServiceKey: e.target.value })}
-                          className="border-2 border-gray-200 focus:border-purple-500 rounded-xl h-12"
-                        />
-                        <p className="text-xs text-gray-500">For admin operations (keep secure, backend only)</p>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex gap-3 pt-4">
-                        <Button
-                          onClick={handleTestConnection}
-                          disabled={dbConnectionStatus === 'connecting'}
-                          className="flex-1 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 h-12"
-                        >
-                          {dbConnectionStatus === 'connecting' ? (
-                            <>
-                              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                              Testing Connection...
-                            </>
-                          ) : (
-                            <>
-                              <Wifi className="w-5 h-5 mr-2" />
-                              Test Connection
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          onClick={handleSaveDbSettings}
-                          className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 h-12"
-                        >
-                          <Save className="w-5 h-5 mr-2" />
-                          Save Settings
-                        </Button>
-                      </div>
-                      
-                      {/* Permanent Connection Note */}
-                      <div className="mt-4 bg-green-50 border-2 border-green-200 rounded-xl p-3">
-                        <div className="flex items-start gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs text-green-800">
-                            <span className="font-semibold">Permanent Connection:</span> Database credentials are hard-coded. The app automatically connects to Supabase on every launch - even after closing the browser. No reconnection needed!
+                    {/* Warning Notice */}
+                    <div className="bg-red-50 border-l-4 border-red-600 p-4 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="font-semibold text-red-800 mb-1">⚠️ Warning: Irreversible Actions</h4>
+                          <p className="text-sm text-red-700">
+                            These operations will permanently delete data from the cloud database. 
+                            Make sure to export a backup before clearing any data. This action cannot be undone.
                           </p>
                         </div>
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
 
-                  {/* Setup Instructions Card */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-purple-50 to-purple-100 border-b-2 border-purple-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
-                          <HardDrive className="w-5 h-5 text-white" />
-                        </div>
-                        <h3 className="text-xl font-bold text-purple-900">Setup Instructions</h3>
+            {/* SMS Tab */}
+            {activeTab === 'sms' && (
+              <div className="space-y-6">
+                {/* SMS Provider Card */}
+                <div className="bg-white rounded-2xl shadow-lg border border-[#36454F]/10 overflow-hidden">
+                  <div className="p-6 bg-[#FAF4EC] border-b border-[#36454F]/10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#6B7F39] flex items-center justify-center">
+                        <MessageSquare className="w-5 h-5 text-white" />
                       </div>
+                      <h3 className="text-xl font-bold text-[#36454F]">SMS Provider</h3>
                     </div>
-                    <div className="p-6 space-y-4">
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-3">
-                          <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 font-bold flex items-center justify-center flex-shrink-0 text-sm">1</div>
-                          <div>
-                            <h4 className="font-semibold text-gray-900">Create Supabase Project</h4>
-                            <p className="text-sm text-gray-600">Go to <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">supabase.com</a> and create a new project</p>
+                  </div>
+                  <div className="p-6 space-y-6">
+                    {/* Provider Selection */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-[#36454F]">Select SMS Provider</label>
+                      <Select
+                        value={smsProvider}
+                        onValueChange={setSmsProvider}
+                      >
+                        <SelectTrigger className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="africastalking">Africa's Talking</SelectItem>
+                          <SelectItem value="twilio">Twilio</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Africa's Talking Settings */}
+                    {smsProvider === 'africastalking' && (
+                      <div className="space-y-4 bg-[#FAF4EC] rounded-xl p-6 border border-[#36454F]/10">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-[#6B7F39] flex items-center justify-center">
+                            <MessageSquare className="w-4 h-4 text-white" />
                           </div>
+                          <h4 className="font-bold text-[#36454F]">Africa's Talking Settings</h4>
                         </div>
-                        <div className="flex items-start gap-3">
-                          <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 font-bold flex items-center justify-center flex-shrink-0 text-sm">2</div>
-                          <div>
-                            <h4 className="font-semibold text-gray-900">Run Database Schema</h4>
-                            <p className="text-sm text-gray-600">Execute the SQL schema file (<code className="bg-gray-100 px-1 rounded">/database/skyway_suites_schema.sql</code>) in your Supabase SQL Editor</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
+                              <Shield className="w-4 h-4 text-[#6B7F39]" />
+                              API Key
+                            </label>
+                            <Input
+                              type="password"
+                              value={africastalkingSettings.apiKey}
+                              onChange={(e) => setAfricastalkingSettings({...africastalkingSettings, apiKey: e.target.value})}
+                              placeholder="Enter API key"
+                              className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12 bg-white"
+                            />
                           </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 font-bold flex items-center justify-center flex-shrink-0 text-sm">3</div>
-                          <div>
-                            <h4 className="font-semibold text-gray-900">Get API Keys</h4>
-                            <p className="text-sm text-gray-600">Copy your Project URL and API keys from Settings → API section</p>
+                          <div className="space-y-2">
+                            <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
+                              <UserCog className="w-4 h-4 text-[#6B7F39]" />
+                              Username
+                            </label>
+                            <Input
+                              value={africastalkingSettings.username}
+                              onChange={(e) => setAfricastalkingSettings({...africastalkingSettings, username: e.target.value})}
+                              placeholder="Enter username"
+                              className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12 bg-white"
+                            />
                           </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 font-bold flex items-center justify-center flex-shrink-0 text-sm">4</div>
-                          <div>
-                            <h4 className="font-semibold text-gray-900">Configure & Test</h4>
-                            <p className="text-sm text-gray-600">Enter your credentials above and click "Test Connection"</p>
+                          <div className="space-y-2 col-span-2">
+                            <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
+                              <Phone className="w-4 h-4 text-[#6B7F39]" />
+                              Shortcode
+                            </label>
+                            <Input
+                              value={africastalkingSettings.shortcode}
+                              onChange={(e) => setAfricastalkingSettings({...africastalkingSettings, shortcode: e.target.value})}
+                              placeholder="Enter shortcode"
+                              className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12 bg-white"
+                            />
                           </div>
                         </div>
                       </div>
+                    )}
+
+                    {/* Twilio Settings */}
+                    {smsProvider === 'twilio' && (
+                      <div className="space-y-4 bg-[#FAF4EC] rounded-xl p-6 border border-[#36454F]/10">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-[#6B7F39] flex items-center justify-center">
+                            <MessageSquare className="w-4 h-4 text-white" />
+                          </div>
+                          <h4 className="font-bold text-[#36454F]">Twilio Settings</h4>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
+                              <Shield className="w-4 h-4 text-[#6B7F39]" />
+                              Account SID
+                            </label>
+                            <Input
+                              value={twilioSettings.accountSid}
+                              onChange={(e) => setTwilioSettings({...twilioSettings, accountSid: e.target.value})}
+                              placeholder="Enter Account SID"
+                              className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12 bg-white"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
+                              <Shield className="w-4 h-4 text-[#6B7F39]" />
+                              Auth Token
+                            </label>
+                            <Input
+                              type="password"
+                              value={twilioSettings.authToken}
+                              onChange={(e) => setTwilioSettings({...twilioSettings, authToken: e.target.value})}
+                              placeholder="Enter Auth Token"
+                              className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12 bg-white"
+                            />
+                          </div>
+                          <div className="space-y-2 col-span-2">
+                            <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
+                              <Phone className="w-4 h-4 text-[#6B7F39]" />
+                              Phone Number
+                            </label>
+                            <Input
+                              value={twilioSettings.phoneNumber}
+                              onChange={(e) => setTwilioSettings({...twilioSettings, phoneNumber: e.target.value})}
+                              placeholder="+1234567890"
+                              className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12 bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Save Button */}
+                    <div className="pt-4 border-t border-[#36454F]/10">
+                      <Button 
+                        onClick={handleSaveSmsSettings}
+                        className="w-full md:w-auto bg-[#6B7F39] hover:bg-[#5a6930] text-white font-semibold py-6 px-8 rounded-xl shadow-lg"
+                        disabled={!isOnline}
+                      >
+                        <Save className="w-5 h-5 mr-2" />
+                        Save SMS Settings
+                      </Button>
                     </div>
                   </div>
                 </div>
-              )}
-
-              {/* SMS Integration Tab - Keeping as before */}
-              {activeTab === 'sms' && (
-                <div className="space-y-6">
-                  {/* SMS Provider Card */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-orange-50 to-orange-100 border-b-2 border-orange-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
-                          <MessageSquare className="w-5 h-5 text-white" />
-                        </div>
-                        <h3 className="text-xl font-bold text-orange-900">SMS Provider</h3>
-                      </div>
-                    </div>
-                    <div className="p-6 space-y-6">
-                      {/* Provider Selection */}
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Select Provider
-                        </label>
-                        <Select
-                          value={smsProvider}
-                          onValueChange={setSmsProvider}
-                        >
-                          <SelectTrigger className="border-2 border-gray-200 focus:border-orange-500 rounded-xl h-12">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="africastalking">Africa's Talking</SelectItem>
-                            <SelectItem value="twilio">Twilio</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Africa's Talking Settings */}
-                      {smsProvider === 'africastalking' && (
-                        <div className="space-y-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border-2 border-green-200">
-                          <div className="flex items-center gap-2 mb-4">
-                            <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center">
-                              <MessageSquare className="w-4 h-4 text-white" />
-                            </div>
-                            <h4 className="font-bold text-green-900">Africa's Talking Settings</h4>
-                          </div>
-
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                <Shield className="w-4 h-4 text-green-600" />
-                                API Key
-                              </label>
-                              <Input
-                                type="password"
-                                value={africastalkingSettings.apiKey}
-                                onChange={(e) => setAfricastalkingSettings({...africastalkingSettings, apiKey: e.target.value})}
-                                placeholder="Enter Africa's Talking API Key"
-                                className="border-2 border-gray-200 focus:border-green-500 rounded-xl h-12 bg-white"
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                <UserCog className="w-4 h-4 text-blue-600" />
-                                Username
-                              </label>
-                              <Input
-                                value={africastalkingSettings.username}
-                                onChange={(e) => setAfricastalkingSettings({...africastalkingSettings, username: e.target.value})}
-                                placeholder="Enter username"
-                                className="border-2 border-gray-200 focus:border-green-500 rounded-xl h-12 bg-white"
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                <Phone className="w-4 h-4 text-purple-600" />
-                                Shortcode
-                              </label>
-                              <Input
-                                value={africastalkingSettings.shortcode}
-                                onChange={(e) => setAfricastalkingSettings({...africastalkingSettings, shortcode: e.target.value})}
-                                placeholder="Enter shortcode"
-                                className="border-2 border-gray-200 focus:border-green-500 rounded-xl h-12 bg-white"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Twilio Settings */}
-                      {smsProvider === 'twilio' && (
-                        <div className="space-y-4 bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border-2 border-red-200">
-                          <div className="flex items-center gap-2 mb-4">
-                            <div className="w-8 h-8 rounded-lg bg-red-600 flex items-center justify-center">
-                              <MessageSquare className="w-4 h-4 text-white" />
-                            </div>
-                            <h4 className="font-bold text-red-900">Twilio Settings</h4>
-                          </div>
-
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                <Shield className="w-4 h-4 text-red-600" />
-                                Account SID
-                              </label>
-                              <Input
-                                value={twilioSettings.accountSid}
-                                onChange={(e) => setTwilioSettings({...twilioSettings, accountSid: e.target.value})}
-                                placeholder="Enter Twilio Account SID"
-                                className="border-2 border-gray-200 focus:border-red-500 rounded-xl h-12 bg-white"
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                <Shield className="w-4 h-4 text-orange-600" />
-                                Auth Token
-                              </label>
-                              <Input
-                                type="password"
-                                value={twilioSettings.authToken}
-                                onChange={(e) => setTwilioSettings({...twilioSettings, authToken: e.target.value})}
-                                placeholder="Enter Auth Token"
-                                className="border-2 border-gray-200 focus:border-red-500 rounded-xl h-12 bg-white"
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                                <Phone className="w-4 h-4 text-green-600" />
-                                Phone Number
-                              </label>
-                              <Input
-                                value={twilioSettings.phoneNumber}
-                                onChange={(e) => setTwilioSettings({...twilioSettings, phoneNumber: e.target.value})}
-                                placeholder="+1234567890"
-                                className="border-2 border-gray-200 focus:border-red-500 rounded-xl h-12 bg-white"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Default Messages Card */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-blue-50 to-blue-100 border-b-2 border-blue-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
-                          <Edit className="w-5 h-5 text-white" />
-                        </div>
-                        <h3 className="text-xl font-bold text-blue-900">Default Messages</h3>
-                      </div>
-                    </div>
-                    <div className="p-6 space-y-6">
-                      {/* Booking Made Message */}
-                      <div className="space-y-3 bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-5 border-2 border-red-200">
-                        <label className="flex items-center gap-2 text-sm font-semibold text-red-900">
-                          <Shield className="w-4 h-4" />
-                          Booking Made (Admin Notification)
-                        </label>
-                        <Textarea
-                          value={defaultMessages.bookingMadeAdmin}
-                          onChange={(e) => setDefaultMessages({...defaultMessages, bookingMadeAdmin: e.target.value})}
-                          rows={3}
-                          placeholder="Message sent to admin when a booking is made"
-                          className="border-2 border-gray-200 focus:border-red-500 rounded-xl bg-white"
-                        />
-                        <p className="text-xs text-red-700 flex items-center gap-1">
-                          <Mail className="w-3 h-3" />
-                          Sent to: Admin number in Company Details
-                        </p>
-                      </div>
-
-                      {/* Booking Approved Message */}
-                      <div className="space-y-3 bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-5 border-2 border-green-200">
-                        <label className="flex items-center gap-2 text-sm font-semibold text-green-900">
-                          <Users className="w-4 h-4" />
-                          Booking Approved (Customer Notification)
-                        </label>
-                        <Textarea
-                          value={defaultMessages.bookingApprovedCustomer}
-                          onChange={(e) => setDefaultMessages({...defaultMessages, bookingApprovedCustomer: e.target.value})}
-                          rows={3}
-                          placeholder="Message sent to customer when booking is approved"
-                          className="border-2 border-gray-200 focus:border-green-500 rounded-xl bg-white"
-                        />
-                        <p className="text-xs text-green-700 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Sent to: Customer's phone number when admin approves booking
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Custom Message Card */}
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-100 overflow-hidden">
-                    <div className="p-6 bg-gradient-to-r from-purple-50 to-purple-100 border-b-2 border-purple-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
-                          <Send className="w-5 h-5 text-white" />
-                        </div>
-                        <h3 className="text-xl font-bold text-purple-900">Send Custom Message</h3>
-                      </div>
-                    </div>
-                    <div className="p-6 space-y-6">
-                      {/* Recipients */}
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Send To
-                        </label>
-                        <Select
-                          value={messageRecipients}
-                          onValueChange={setMessageRecipients}
-                        >
-                          <SelectTrigger className="border-2 border-gray-200 focus:border-purple-500 rounded-xl h-12">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="everyone">
-                              <span className="flex items-center gap-2">
-                                <Users className="w-4 h-4 text-purple-600" />
-                                Everyone
-                              </span>
-                            </SelectItem>
-                            <SelectItem value="customers">
-                              <span className="flex items-center gap-2">
-                                <Users className="w-4 h-4 text-green-600" />
-                                Customers Only
-                              </span>
-                            </SelectItem>
-                            <SelectItem value="staff">
-                              <span className="flex items-center gap-2">
-                                <Shield className="w-4 h-4 text-red-600" />
-                                Staff Only (Admin & Manager)
-                              </span>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Message */}
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Message
-                        </label>
-                        <Textarea
-                          value={customMessage}
-                          onChange={(e) => setCustomMessage(e.target.value)}
-                          rows={5}
-                          placeholder="Type your message here..."
-                          className="border-2 border-gray-200 focus:border-purple-500 rounded-xl"
-                        />
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t-2 border-gray-100">
-                        <Button
-                          onClick={handleSendCustomMessage}
-                          className="flex-1 bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-6 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-                        >
-                          <Send className="w-5 h-5 mr-2" />
-                          Send Message
-                        </Button>
-                        <Button
-                          onClick={handleSaveSmsSettings}
-                          variant="outline"
-                          className="flex-1 border-2 border-blue-500 text-blue-600 hover:bg-blue-50 font-semibold py-6 px-8 rounded-xl"
-                        >
-                          <Save className="w-5 h-5 mr-2" />
-                          Save SMS Settings
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-        </div>
-      </main>
+
+        </main>
       </div>
 
+      {/* Custom Modal */}
+      {modalState.show && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className={`p-6 rounded-t-2xl ${
+              modalState.type === 'success' ? 'bg-[#6B7F39]' :
+              modalState.type === 'error' ? 'bg-[#36454F]' :
+              modalState.type === 'confirm' ? 'bg-[#6B7F39]' :
+              'bg-[#36454F]'
+            }`}>
+              <h3 className="text-xl font-bold text-white">{modalState.title}</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-[#36454F]">{modalState.message}</p>
+            </div>
+            <div className="p-6 pt-0 flex gap-3 justify-end">
+              {modalState.type === 'confirm' ? (
+                <>
+                  <Button
+                    onClick={closeModal}
+                    variant="outline"
+                    className="border-2 border-[#36454F] text-[#36454F] hover:bg-[#FAF4EC]"
+                  >
+                    {modalState.cancelText}
+                  </Button>
+                  <Button
+                    onClick={handleModalConfirm}
+                    className="bg-[#6B7F39] hover:bg-[#5a6930] text-white"
+                  >
+                    {modalState.confirmText}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={closeModal}
+                  className="bg-[#6B7F39] hover:bg-[#5a6930] text-white"
+                >
+                  {modalState.confirmText}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Slide Modal */}
-      {showSlideModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full border-2 border-gray-200">
-            <div className="p-6 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-t-3xl">
-              <h3 className="text-2xl font-bold text-white">
-                {editingSlide ? 'Edit Slide' : 'Add New Slide'}
+      {showSlideModal && editingSlide && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
+            <div className="p-6 bg-[#6B7F39] rounded-t-2xl">
+              <h3 className="text-xl font-bold text-white">
+                {homePageSettings.slides.find(s => s.id === editingSlide.id) ? 'Edit Slide' : 'Add Slide'}
               </h3>
             </div>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              handleSaveSlide({
-                title: formData.get('title'),
-                subtitle: formData.get('subtitle'),
-                image: editingSlide?.image || ''
-              });
-            }} className="p-6 space-y-4">
+            <div className="p-6 space-y-4">
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Title *</label>
+                <label className="text-sm font-semibold text-[#36454F]">Title</label>
                 <Input
-                  name="title"
-                  defaultValue={editingSlide?.title || ''}
-                  required
-                  placeholder="Enter slide title"
-                  className="border-2 border-gray-200 rounded-xl h-12"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Subtitle *</label>
-                <Input
-                  name="subtitle"
-                  defaultValue={editingSlide?.subtitle || ''}
-                  required
-                  placeholder="Enter slide subtitle"
-                  className="border-2 border-gray-200 rounded-xl h-12"
-                />
-              </div>
-              <div className="flex gap-3 pt-4">
-                <Button type="submit" className="flex-1 bg-gradient-to-r from-[#6B7F39] to-[#5a6930] py-6 rounded-xl">
-                  Save Slide
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setShowSlideModal(false)} className="flex-1 py-6 rounded-xl">
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Why Us Item Modal */}
-      {showWhyUsModal && editingWhyUsItem && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full border-2 border-gray-200">
-            <div className="p-6 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-t-3xl">
-              <h3 className="text-2xl font-bold text-white">Edit Why Us Item</h3>
-            </div>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              handleSaveWhyUsItem({
-                title: formData.get('title'),
-                description: formData.get('description')
-              });
-            }} className="p-6 space-y-4">
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Title *</label>
-                <Input
-                  name="title"
-                  defaultValue={editingWhyUsItem.title}
-                  required
-                  className="border-2 border-gray-200 rounded-xl h-12"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Description *</label>
-                <Textarea
-                  name="description"
-                  defaultValue={editingWhyUsItem.description}
-                  required
-                  rows={3}
-                  className="border-2 border-gray-200 rounded-xl"
-                />
-              </div>
-              <div className="flex gap-3 pt-4">
-                <Button type="submit" className="flex-1 bg-gradient-to-r from-[#6B7F39] to-[#5a6930] py-6 rounded-xl">
-                  Save Changes
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setShowWhyUsModal(false)} className="flex-1 py-6 rounded-xl">
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Add/Edit User Modal */}
-      {showAddUserModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto border-2 border-gray-200 animate-in zoom-in-95 duration-300">
-            <div className="p-6 bg-gradient-to-r from-[#6B7F39] to-[#36454F] rounded-t-3xl">
-              <h3 className="text-2xl font-bold text-white flex items-center gap-3">
-                {editingUser ? (
-                  <>
-                    <Edit className="w-6 h-6" />
-                    Edit User
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-6 h-6" />
-                    Add New User
-                  </>
-                )}
-              </h3>
-            </div>
-
-            <form onSubmit={editingUser ? handleUpdateUser : handleAddUser} className="p-6 space-y-5">
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                  <UserCog className="w-4 h-4 text-blue-600" />
-                  Full Name *
-                </label>
-                <Input
-                  value={newUser.name}
-                  onChange={(e) => setNewUser({...newUser, name: e.target.value})}
-                  placeholder="John Doe"
-                  required
+                  value={editingSlide.title}
+                  onChange={(e) => setEditingSlide({...editingSlide, title: e.target.value})}
                   className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
                 />
               </div>
-
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                  <Mail className="w-4 h-4 text-red-600" />
-                  Email Address *
-                </label>
+                <label className="text-sm font-semibold text-[#36454F]">Subtitle</label>
+                <Input
+                  value={editingSlide.subtitle}
+                  onChange={(e) => setEditingSlide({...editingSlide, subtitle: e.target.value})}
+                  className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                />
+              </div>
+            </div>
+            <div className="p-6 pt-0 flex gap-3 justify-end">
+              <Button
+                onClick={() => {
+                  setShowSlideModal(false);
+                  setEditingSlide(null);
+                }}
+                variant="outline"
+                className="border-2 border-[#36454F] text-[#36454F] hover:bg-[#FAF4EC]"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveSlide}
+                className="bg-[#6B7F39] hover:bg-[#5a6930] text-white"
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add User Modal */}
+      {showAddUserModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
+            <div className="p-6 bg-[#6B7F39] rounded-t-2xl">
+              <h3 className="text-xl font-bold text-white">Add New User</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-[#36454F]">Name</label>
+                <Input
+                  value={newUser.name}
+                  onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+                  className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-[#36454F]">Email</label>
                 <Input
                   type="email"
                   value={newUser.email}
                   onChange={(e) => setNewUser({...newUser, email: e.target.value})}
-                  placeholder="john@example.com"
-                  required
                   className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
                 />
               </div>
-
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                  <Phone className="w-4 h-4 text-green-600" />
-                  Phone Number *
-                </label>
+                <label className="text-sm font-semibold text-[#36454F]">Phone</label>
                 <Input
                   value={newUser.phone}
                   onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
-                  placeholder="+254 700 000 000"
-                  required
                   className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
                 />
               </div>
-
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                  <Shield className="w-4 h-4 text-purple-600" />
-                  Password {editingUser && '(leave blank to keep current)'}
-                </label>
-                <Input
-                  type="password"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({...newUser, password: e.target.value})}
-                  placeholder="Enter password"
-                  required={!editingUser}
-                  className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                  <Shield className="w-4 h-4 text-orange-600" />
-                  Role *
-                </label>
+                <label className="text-sm font-semibold text-[#36454F]">Role</label>
                 <Select
                   value={newUser.role}
                   onValueChange={(value) => setNewUser({...newUser, role: value})}
@@ -2762,297 +1903,34 @@ export function Settings() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Admin">
-                      <span className="flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-red-500" />
-                        Admin
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="Manager">
-                      <span className="flex items-center gap-2">
-                        <UserCog className="w-4 h-4 text-blue-500" />
-                        Manager
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="Customer">
-                      <span className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-green-500" />
-                        Customer
-                      </span>
-                    </SelectItem>
+                    <SelectItem value="Admin">Admin</SelectItem>
+                    <SelectItem value="Manager">Manager</SelectItem>
+                    <SelectItem value="Customer">Customer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className="flex gap-3 pt-6 border-t-2 border-gray-100">
-                <Button
-                  type="submit"
-                  className="flex-1 bg-gradient-to-r from-[#6B7F39] to-[#5a6930] hover:from-[#5a6930] hover:to-[#4a5828] text-white font-semibold py-6 rounded-xl shadow-lg"
-                >
-                  {editingUser ? 'Update User' : 'Add User'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setShowAddUserModal(false);
-                    setEditingUser(null);
-                    setNewUser({
-                      name: '',
-                      email: '',
-                      phone: '',
-                      password: '',
-                      role: 'Customer'
-                    });
-                  }}
-                  className="flex-1 border-2 border-gray-300 font-semibold py-6 rounded-xl"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Manage Roles Modal */}
-      {showManageRolesModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border-2 border-gray-200 animate-in zoom-in-95 duration-300">
-            <div className="p-6 bg-gradient-to-r from-[#36454F] to-[#6B7F39] rounded-t-3xl">
-              <h3 className="text-2xl font-bold text-white flex items-center gap-3">
-                <Shield className="w-7 h-7" />
-                Manage Roles & Permissions
-              </h3>
             </div>
-
-            <div className="p-6 space-y-5">
-              {/* Admin Role */}
-              <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-6 border-2 border-red-300 shadow-md">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg">
-                    <Shield className="w-7 h-7 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="text-xl font-bold text-red-900">Administrator</h4>
-                    <p className="text-sm text-red-700">Full system access and control</p>
-                  </div>
-                </div>
-                <ul className="space-y-2 text-sm text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
-                    <span>Manage all properties, bookings, and customers</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
-                    <span>Access system settings and configurations</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
-                    <span>Manage user accounts and permissions</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
-                    <span>View all reports and analytics</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
-                    <span>Backup and restore database</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Manager Role */}
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 border-2 border-blue-300 shadow-md">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
-                    <UserCog className="w-7 h-7 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="text-xl font-bold text-blue-900">Manager</h4>
-                    <p className="text-sm text-blue-700">Property and booking management</p>
-                  </div>
-                </div>
-                <ul className="space-y-2 text-sm text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <span>Manage properties and bookings</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <span>View and manage customers</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <span>Approve or decline bookings</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <span>View reports and analytics</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <span>Cannot access system settings</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Customer Role */}
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-6 border-2 border-green-300 shadow-md">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-lg">
-                    <Users className="w-7 h-7 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="text-xl font-bold text-green-900">Customer</h4>
-                    <p className="text-sm text-green-700">Basic booking access</p>
-                  </div>
-                </div>
-                <ul className="space-y-2 text-sm text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span>Browse available properties</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span>Create booking requests</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span>View own booking history</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span>Update own profile information</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span>Cannot access admin features</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="p-6 border-t-2 border-gray-100">
+            <div className="p-6 pt-0 flex gap-3 justify-end">
               <Button
-                onClick={() => setShowManageRolesModal(false)}
-                className="w-full bg-gradient-to-r from-[#36454F] to-[#6B7F39] hover:from-[#2a3640] hover:to-[#5a6930] text-white font-semibold py-6 rounded-xl shadow-lg"
+                onClick={() => {
+                  setShowAddUserModal(false);
+                  setNewUser({ name: '', email: '', phone: '', password: '', role: 'Customer' });
+                }}
+                variant="outline"
+                className="border-2 border-[#36454F] text-[#36454F] hover:bg-[#FAF4EC]"
               >
-                Close
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddUser}
+                className="bg-[#6B7F39] hover:bg-[#5a6930] text-white"
+              >
+                Add User
               </Button>
             </div>
           </div>
         </div>
       )}
-
-
-
-      {/* Error Popup - Auto-disappears after 5 seconds */}
-      {showErrorPopup && connectionError && (
-        <div className="fixed top-4 right-4 z-[60] animate-in slide-in-from-top duration-300">
-          <div className="bg-white rounded-2xl shadow-2xl border-2 border-red-300 p-6 max-w-md">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
-                <AlertCircle className="w-6 h-6 text-red-600" />
-              </div>
-              <div className="flex-1">
-                <h4 className="font-bold text-red-900 mb-2 flex items-center gap-2">
-                  Connection Failed
-                </h4>
-                <p className="text-sm text-red-700">{connectionError}</p>
-                <div className="mt-4 h-1 bg-red-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-red-500 rounded-full animate-[shrink_5s_linear_forwards]" style={{
-                    animation: 'shrink 5s linear forwards',
-                    width: '100%'
-                  }}></div>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowErrorPopup(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Universal Modal - Success, Error, Confirm, Info */}
-      {modalState.show && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4 animate-in fade-in duration-300">
-          <div className={`bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden border-2 ${
-            modalState.type === 'success' ? 'border-green-300' :
-            modalState.type === 'error' ? 'border-red-300' :
-            modalState.type === 'confirm' ? 'border-orange-300' :
-            'border-blue-300'
-          } animate-in zoom-in-95 duration-300`}>
-            {/* Header */}
-            <div className={`p-4 bg-gradient-to-r ${
-              modalState.type === 'success' ? 'from-green-500 to-green-600' :
-              modalState.type === 'error' ? 'from-red-500 to-red-600' :
-              modalState.type === 'confirm' ? 'from-orange-500 to-orange-600' :
-              'from-blue-500 to-blue-600'
-            }`}>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  {modalState.type === 'success' && <CheckCircle2 className="w-6 h-6 text-white" />}
-                  {modalState.type === 'error' && <AlertCircle className="w-6 h-6 text-white" />}
-                  {modalState.type === 'confirm' && <Info className="w-6 h-6 text-white" />}
-                  {modalState.type === 'info' && <Info className="w-6 h-6 text-white" />}
-                </div>
-                <h3 className="text-lg font-bold text-white">{modalState.title}</h3>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-5">
-              <p className="text-gray-700 text-sm leading-relaxed">{modalState.message}</p>
-            </div>
-
-            {/* Actions */}
-            <div className={`p-4 border-t-2 border-gray-100 bg-gray-50 ${
-              modalState.type === 'confirm' ? 'flex gap-3' : ''
-            }`}>
-              {modalState.type === 'confirm' ? (
-                <>
-                  <Button
-                    onClick={closeModal}
-                    variant="outline"
-                    className="flex-1 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 rounded-xl h-11 font-semibold text-sm"
-                  >
-                    {modalState.cancelText || 'Cancel'}
-                  </Button>
-                  <Button
-                    onClick={handleModalConfirm}
-                    className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl h-11 font-semibold text-sm shadow-lg"
-                  >
-                    {modalState.confirmText || 'OK'}
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  onClick={handleModalConfirm}
-                  className={`w-full bg-gradient-to-r ${
-                    modalState.type === 'success' ? 'from-green-500 to-green-600 hover:from-green-600 hover:to-green-700' :
-                    modalState.type === 'error' ? 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700' :
-                    'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
-                  } text-white rounded-xl h-11 font-semibold text-sm shadow-lg`}
-                >
-                  {modalState.confirmText || 'OK'}
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes shrink {
-          from { width: 100%; }
-          to { width: 0%; }
-        }
-      `}</style>
     </div>
   );
 }

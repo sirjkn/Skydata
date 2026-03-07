@@ -28,12 +28,16 @@ import {
   CheckCircle2,
   AlertCircle,
   Printer,
-  Download
+  Download,
+  Database,
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { getCurrentUser, logout, isAdmin } from '../lib/auth';
 import { CustomModal } from '../components/custom-modal';
+import { RichTextEditor } from '../components/rich-text-editor';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 // Connection monitoring
@@ -63,7 +67,12 @@ import {
   createPayment,
   deletePayment,
   fetchPaymentsByBooking,
-  createActivityLog
+  createActivityLog,
+  clearAllProperties,
+  clearAllCustomers,
+  clearAllBookings,
+  clearAllPayments,
+  deleteActivityLogs
 } from '../../lib/supabaseData';
 import * as adminHelpers from '../lib/adminHelpers';
 
@@ -232,6 +241,10 @@ export function AdminDashboard() {
   const [isOnline, setIsOnline] = useState(checkConnection());
   const [payments, setPayments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSavingProperty, setIsSavingProperty] = useState(false);
+  const [isUpdatingProperty, setIsUpdatingProperty] = useState(false);
+  const [isSavingBooking, setIsSavingBooking] = useState(false);
+  const [isSavingPayment, setIsSavingPayment] = useState(false);
   
   // Property form state
   const [propertyForm, setPropertyForm] = useState({
@@ -260,6 +273,17 @@ export function AdminDashboard() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationProgress, setMigrationProgress] = useState({ current: 0, total: 0 });
   const [showMigrationButton, setShowMigrationButton] = useState(false);
+
+  // Settings tab state
+  const [settingsTab, setSettingsTab] = useState<'system' | 'data'>('system');
+
+  // Booking filters state
+  const [bookingFilters, setBookingFilters] = useState({
+    category: 'all',
+    customerId: 'all',
+    dateFrom: '',
+    dateTo: ''
+  });
 
   // Modal States
   const [modalState, setModalState] = useState<{
@@ -503,22 +527,28 @@ export function AdminDashboard() {
         
         // Load properties
         const propertiesData = await fetchProperties();
-        const mappedProperties = propertiesData.map(p => ({
-          id: p.property_id,
-          name: p.property_name,
-          category: p.category_id,
-          location: p.location,
-          beds: p.no_of_beds,
-          baths: p.bathrooms,
-          area: p.area_sqft,
-          price: p.price_per_month,
-          photos: p.photos ? JSON.parse(p.photos) : {},
-          features: p.features ? JSON.parse(p.features) : [],
-          description: p.description || '',
-          viewCount: p.view_count,
-          isFeatured: p.is_featured,
-          isAvailable: p.is_available
-        }));
+        const mappedProperties = propertiesData.map(p => {
+          // Map category_id to category_name
+          const categoryObj = categoriesData.find((c: any) => c.category_id === p.category_id);
+          const categoryName = categoryObj ? categoryObj.category_name : '';
+          
+          return {
+            id: p.property_id,
+            name: p.property_name,
+            category: categoryName,
+            location: p.location,
+            beds: p.no_of_beds,
+            baths: p.bathrooms,
+            area: p.area_sqft,
+            price: p.price_per_month,
+            photos: p.photos ? JSON.parse(p.photos) : {},
+            features: p.features ? JSON.parse(p.features) : [],
+            description: p.description || '',
+            viewCount: p.view_count,
+            isFeatured: p.is_featured,
+            isAvailable: p.is_available
+          };
+        });
         setProperties(mappedProperties);
         console.log('✅ Properties loaded:', mappedProperties.length);
         
@@ -539,7 +569,6 @@ export function AdminDashboard() {
           notes: b.notes,
           payments: []
         }));
-        setBookings(mappedBookings);
         console.log('✅ Bookings loaded:', mappedBookings.length);
         
         // Load customers
@@ -555,18 +584,47 @@ export function AdminDashboard() {
         setCustomers(mappedCustomers);
         console.log('✅ Customers loaded:', mappedCustomers.length);
         
-        // Load payments
+        // Enrich bookings with property and customer names
+        const enrichedBookings = mappedBookings.map(booking => {
+          const property = mappedProperties.find(p => p.id === booking.propertyId);
+          const customer = mappedCustomers.find(c => c.id === booking.customerId);
+          return {
+            ...booking,
+            propertyName: property?.name || 'Unknown Property',
+            customerName: customer?.name || 'Unknown Customer',
+            customerEmail: customer?.email || '',
+            customerPhone: customer?.phone || ''
+          };
+        });
+        setBookings(enrichedBookings);
+        console.log('✅ Bookings enriched with property and customer names');
+        
+        // Load payments and enrich with customer/property data from bookings
         const paymentsData = await fetchPayments();
-        const mappedPayments = paymentsData.map(p => ({
-          id: p.payment_id,
-          bookingId: p.booking_id,
-          paidAmount: p.amount,
-          paymentMode: p.payment_method,
-          transactionId: p.payment_reference,
-          date: p.payment_date
-        }));
-        setPayments(mappedPayments);
-        console.log('✅ Payments loaded:', mappedPayments.length);
+        const enrichedPayments = paymentsData.map(p => {
+          const relatedBooking = enrichedBookings.find(b => b.id === p.booking_id);
+          // Calculate balance for this payment by comparing all payments for this booking
+          const bookingPayments = paymentsData.filter(pay => pay.booking_id === p.booking_id);
+          const totalPaid = bookingPayments.reduce((sum, pay) => sum + (pay.amount || 0), 0);
+          const balance = relatedBooking ? Math.max(0, (relatedBooking.totalAmount || 0) - totalPaid) : 0;
+          
+          return {
+            id: p.payment_id,
+            bookingId: p.booking_id,
+            paidAmount: p.amount,
+            paymentMode: p.payment_method,
+            transactionId: p.payment_reference,
+            date: p.payment_date,
+            // Enrich with customer and property data from booking
+            customerName: relatedBooking?.customerName || 'Unknown Customer',
+            customerEmail: relatedBooking?.customerEmail || '',
+            customerPhone: relatedBooking?.customerPhone || '',
+            propertyName: relatedBooking?.propertyName || 'Unknown Property',
+            balance: balance
+          };
+        });
+        setPayments(enrichedPayments);
+        console.log('✅ Payments loaded and enriched:', enrichedPayments.length);
         
         // Load activity logs
         const logsData = await fetchActivityLogs(100);
@@ -618,7 +676,20 @@ export function AdminDashboard() {
             notes: b.notes,
             payments: []
           }));
-          setBookings(mappedBookings);
+          
+          // Enrich bookings with property and customer names
+          const enrichedBookings = mappedBookings.map(booking => {
+            const property = properties.find(p => p.id === booking.propertyId);
+            const customer = customers.find(c => c.id === booking.customerId);
+            return {
+              ...booking,
+              propertyName: property?.name || 'Unknown Property',
+              customerName: customer?.name || 'Unknown Customer',
+              customerEmail: customer?.email || '',
+              customerPhone: customer?.phone || ''
+            };
+          });
+          setBookings(enrichedBookings);
           setBookingsRefreshKey(prev => prev + 1);
         } catch (error) {
           console.error('Error reloading bookings:', error);
@@ -748,7 +819,20 @@ export function AdminDashboard() {
         notes: b.notes,
         payments: []
       }));
-      setBookings(mappedBookings);
+      
+      // Enrich bookings with property and customer names
+      const enrichedBookings = mappedBookings.map(booking => {
+        const property = properties.find(p => p.id === booking.propertyId);
+        const customer = customers.find(c => c.id === booking.customerId);
+        return {
+          ...booking,
+          propertyName: property?.name || 'Unknown Property',
+          customerName: customer?.name || 'Unknown Customer',
+          customerEmail: customer?.email || '',
+          customerPhone: customer?.phone || ''
+        };
+      });
+      setBookings(enrichedBookings);
       setBookingsRefreshKey(prev => prev + 1); // Trigger re-render
     } catch (error) {
       console.error('Error reloading bookings:', error);
@@ -1137,10 +1221,10 @@ export function AdminDashboard() {
 
     const filesArray = Array.from(files);
     
-    // Limit total photos per property to 30
+    // Limit total photos per property to 60
     const currentPhotoCount = Object.values(photos).reduce((sum, arr) => sum + arr.length, 0);
-    if (currentPhotoCount + filesArray.length > 30) {
-      showModal('error', 'Photo Limit Reached', 'Maximum 30 photos allowed per property. Please remove some photos before adding more.');
+    if (currentPhotoCount + filesArray.length > 60) {
+      showModal('error', 'Photo Limit Reached', 'Maximum 60 photos allowed per property. Please remove some photos before adding more.');
       return;
     }
 
@@ -1225,6 +1309,9 @@ export function AdminDashboard() {
       return;
     }
 
+    // Set loading state
+    setIsSavingProperty(true);
+
     try {
       // Create new property via Supabase
       const newProperty = await adminHelpers.addProperty(propertyForm, photos);
@@ -1276,6 +1363,9 @@ export function AdminDashboard() {
     } catch (error) {
       console.error('Error adding property:', error);
       showModal('error', 'Error', 'Failed to add property. Please try again.');
+    } finally {
+      // Always reset loading state
+      setIsSavingProperty(false);
     }
   };
 
@@ -1292,6 +1382,9 @@ export function AdminDashboard() {
       showModal('error', 'No Connection', 'Cannot update property. Please check your internet connection.');
       return;
     }
+
+    // Set loading state
+    setIsUpdatingProperty(true);
 
     try {
       // Update property via Supabase
@@ -1329,6 +1422,9 @@ export function AdminDashboard() {
     } catch (error) {
       console.error('Error updating property:', error);
       showModal('error', 'Update Failed', 'Failed to update property. Please try again.');
+    } finally {
+      // Always reset loading state
+      setIsUpdatingProperty(false);
     }
   };
 
@@ -1491,6 +1587,9 @@ export function AdminDashboard() {
       return;
     }
 
+    // Set loading state
+    setIsSavingBooking(true);
+
     // Save to Supabase
     try {
       const bookingData = {
@@ -1513,6 +1612,7 @@ export function AdminDashboard() {
     } catch (error) {
       console.error('Error creating booking:', error);
       showModal('error', 'Error', 'Failed to create booking. Please try again.');
+      setIsSavingBooking(false);
       return;
     }
 
@@ -1547,6 +1647,7 @@ export function AdminDashboard() {
     setCustomerSearchTerm('');
     setShowPropertyDropdown(false);
     setShowCustomerDropdown(false);
+    setIsSavingBooking(false); // Reset loading state
 
     showModal('success', 'Booking Created', `Booking created successfully!\n\nProperty: ${bookingForm.propertyName}\nCustomer: ${bookingForm.customerName}\nDays: ${days}\nTotal Amount: KSh ${totalAmount.toLocaleString()}`);
   };
@@ -2184,6 +2285,95 @@ export function AdminDashboard() {
                   </Button>
                 </div>
 
+                {/* Booking Filters */}
+                <Card className="mb-6">
+                  <CardHeader>
+                    <CardTitle className="text-base md:text-lg font-bold text-[#36454F] flex items-center gap-2">
+                      <Search className="w-5 h-5" />
+                      Filter Bookings
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Category Filter */}
+                      <div>
+                        <label className="block text-sm font-medium text-[#36454F] mb-2">
+                          Category
+                        </label>
+                        <select
+                          value={bookingFilters.category}
+                          onChange={(e) => setBookingFilters({ ...bookingFilters, category: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6B7F39] text-sm"
+                        >
+                          <option value="all">All Categories</option>
+                          {categories.map((cat, idx) => (
+                            <option key={idx} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Customer Filter */}
+                      <div>
+                        <label className="block text-sm font-medium text-[#36454F] mb-2">
+                          Customer
+                        </label>
+                        <select
+                          value={bookingFilters.customerId}
+                          onChange={(e) => setBookingFilters({ ...bookingFilters, customerId: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6B7F39] text-sm"
+                        >
+                          <option value="all">All Customers</option>
+                          {customers.map((customer) => (
+                            <option key={customer.id} value={customer.id.toString()}>
+                              {customer.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Date From Filter */}
+                      <div>
+                        <label className="block text-sm font-medium text-[#36454F] mb-2">
+                          Date From
+                        </label>
+                        <input
+                          type="date"
+                          value={bookingFilters.dateFrom}
+                          onChange={(e) => setBookingFilters({ ...bookingFilters, dateFrom: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6B7F39] text-sm"
+                        />
+                      </div>
+
+                      {/* Date To Filter */}
+                      <div>
+                        <label className="block text-sm font-medium text-[#36454F] mb-2">
+                          Date To
+                        </label>
+                        <input
+                          type="date"
+                          value={bookingFilters.dateTo}
+                          onChange={(e) => setBookingFilters({ ...bookingFilters, dateTo: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6B7F39] text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Clear Filters Button */}
+                    {(bookingFilters.category !== 'all' || bookingFilters.customerId !== 'all' || bookingFilters.dateFrom || bookingFilters.dateTo) && (
+                      <div className="mt-4">
+                        <Button
+                          onClick={() => setBookingFilters({ category: 'all', customerId: 'all', dateFrom: '', dateTo: '' })}
+                          variant="outline"
+                          className="text-sm"
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Clear All Filters
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
                 {/* List of Bookings */}
                 <Card>
                   <CardHeader>
@@ -2196,8 +2386,62 @@ export function AdminDashboard() {
                         <p className="text-sm">No bookings yet. Go to Properties to book a property.</p>
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        {bookings.map((booking) => {
+                      (() => {
+                        // Filter bookings based on selected filters
+                        const filteredBookings = bookings.filter((booking) => {
+                          // Filter by category
+                          if (bookingFilters.category !== 'all') {
+                            const property = properties.find(p => p.id.toString() === booking.propertyId.toString());
+                            if (!property || property.category !== bookingFilters.category) {
+                              return false;
+                            }
+                          }
+
+                          // Filter by customer
+                          if (bookingFilters.customerId !== 'all') {
+                            if (booking.customerId.toString() !== bookingFilters.customerId) {
+                              return false;
+                            }
+                          }
+
+                          // Filter by date range
+                          if (bookingFilters.dateFrom) {
+                            const checkInDate = new Date(booking.checkIn);
+                            const fromDate = new Date(bookingFilters.dateFrom);
+                            if (checkInDate < fromDate) {
+                              return false;
+                            }
+                          }
+
+                          if (bookingFilters.dateTo) {
+                            const checkInDate = new Date(booking.checkIn);
+                            const toDate = new Date(bookingFilters.dateTo);
+                            if (checkInDate > toDate) {
+                              return false;
+                            }
+                          }
+
+                          return true;
+                        });
+
+                        return filteredBookings.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500">
+                            <Search className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                            <p className="text-sm">No bookings found matching the selected filters.</p>
+                            <Button
+                              onClick={() => setBookingFilters({ category: 'all', customerId: 'all', dateFrom: '', dateTo: '' })}
+                              variant="outline"
+                              className="mt-4 text-sm"
+                            >
+                              Clear Filters
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="text-sm text-gray-600 mb-3">
+                              Showing {filteredBookings.length} of {bookings.length} bookings
+                            </div>
+                            {filteredBookings.map((booking) => {
                           const paymentStatus = getBookingPaymentStatus(booking);
                           
                           return (
@@ -2379,13 +2623,16 @@ export function AdminDashboard() {
                               </Button>
                             </div>
                           </div>
-                        )})}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </>
-            )}
+                        );
+                      })}
+                    </div>
+                  );
+                })()
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
 
             {/* Customer Management Content */}
             {activeMenu === 'customers' && (
@@ -2598,11 +2845,11 @@ export function AdminDashboard() {
                               </thead>
                               <tbody>
                                 {allPayments
-                                  .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                  .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
                                   .map((payment: any) => (
                                     <tr key={payment.id} className="border-b hover:bg-[#FAF4EC] transition">
                                       <td className="px-3 py-3 text-xs md:text-sm text-gray-700">
-                                        {new Date(payment.createdAt).toLocaleDateString()}
+                                        {new Date(payment.date).toLocaleDateString()}
                                       </td>
                                       <td className="px-3 py-3">
                                         <div className="text-xs md:text-sm text-gray-700">{payment.customerName}</div>
@@ -2714,91 +2961,377 @@ export function AdminDashboard() {
 
             {/* Settings Content */}
             {activeMenu === 'settings' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg md:text-xl font-bold text-[#36454F]">Settings</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {/* Storage Optimization Section */}
-                    <div className="border border-gray-200 rounded-lg p-6">
-                      <h3 className="text-lg font-semibold text-[#36454F] mb-2 flex items-center gap-2">
-                        <Building2 className="w-5 h-5 text-[#6B7F39]" />
-                        Storage Optimization
-                      </h3>
-                      <p className="text-sm text-gray-600 mb-4">
-                        Convert all existing property images to WebP format and compress to maximum 50KB each. This significantly reduces storage usage.
-                      </p>
-                      
-                      {/* Storage Info */}
-                      {(() => {
-                        const storage = getStorageUsage();
-                        const storagePercent = parseFloat(storage.percentage);
-                        return (
-                          <div className={`mb-4 p-3 rounded-lg border ${
-                            storagePercent > 90 ? 'bg-red-50 border-red-200' :
-                            storagePercent > 70 ? 'bg-orange-50 border-orange-200' :
-                            'bg-green-50 border-green-200'
-                          }`}>
-                            <div className="text-sm font-medium">
-                              Current Storage: {storage.usedMB}MB / {storage.totalMB}MB ({storage.percentage}%)
-                            </div>
-                          </div>
-                        );
-                      })()}
-                      
-                      {showMigrationButton && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                          <p className="text-sm text-blue-800 mb-2">
-                            ⚠️ Your property images can be optimized! Click the button below to compress all images to WebP format (max 50KB each).
-                          </p>
-                          <p className="text-xs text-blue-600">
-                            This may take a few minutes depending on the number of properties.
-                          </p>
-                        </div>
-                      )}
-                      
-                      {isMigrating && (
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-700"></div>
-                            <div className="text-sm text-yellow-800">
-                              Migrating images... Property {migrationProgress.current} of {migrationProgress.total}
-                            </div>
-                          </div>
-                          <div className="mt-2 bg-yellow-200 rounded-full h-2 overflow-hidden">
-                            <div 
-                              className="bg-yellow-600 h-full transition-all duration-300"
-                              style={{ width: `${(migrationProgress.current / migrationProgress.total) * 100}%` }}
-                            ></div>
-                          </div>
-                          <p className="text-xs text-yellow-700 mt-2">
-                            Please don't close this page until migration is complete.
-                          </p>
-                        </div>
-                      )}
-                      
-                      <Button
-                        onClick={migrateExistingImages}
-                        disabled={isMigrating || !showMigrationButton}
-                        className={`w-full ${
-                          showMigrationButton && !isMigrating
-                            ? 'bg-[#6B7F39] hover:bg-[#5a6b2f]'
-                            : 'bg-gray-300 cursor-not-allowed'
-                        } text-white`}
-                      >
-                        {isMigrating ? 'Migrating Images...' : 
-                         showMigrationButton ? 'Optimize All Images to WebP (50KB)' : 
-                         '✓ All Images Already Optimized'}
-                      </Button>
-                      
-                      <p className="text-xs text-gray-500 mt-3">
-                        💡 New images uploaded through "Add Property" are automatically optimized to WebP (50KB max).
-                      </p>
-                    </div>
+              <>
+                {/* Settings Tabs Navigation */}
+                <div className="bg-white rounded-lg shadow-sm mb-6 overflow-x-auto">
+                  <div className="flex border-b border-gray-200 min-w-max">
+                    <button
+                      onClick={() => setSettingsTab('system')}
+                      className={`px-6 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
+                        settingsTab === 'system'
+                          ? 'border-b-2 border-[#6B7F39] text-[#6B7F39]'
+                          : 'text-gray-600 hover:text-[#36454F]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Settings className="w-4 h-4" />
+                        System Settings
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setSettingsTab('data')}
+                      className={`px-6 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
+                        settingsTab === 'data'
+                          ? 'border-b-2 border-[#6B7F39] text-[#6B7F39]'
+                          : 'text-gray-600 hover:text-[#36454F]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Database className="w-4 h-4" />
+                        Data Management
+                      </div>
+                    </button>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+
+                {/* System Settings Tab */}
+                {settingsTab === 'system' && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg md:text-xl font-bold text-[#36454F]">System Settings</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-6">
+                        {/* Storage Optimization Section */}
+                        <div className="border border-gray-200 rounded-lg p-6">
+                          <h3 className="text-lg font-semibold text-[#36454F] mb-2 flex items-center gap-2">
+                            <Building2 className="w-5 h-5 text-[#36454F]" />
+                            Storage Optimization
+                          </h3>
+                          <p className="text-sm text-gray-600 mb-4">
+                            Convert all existing property images to WebP format and compress to maximum 50KB each. This significantly reduces storage usage.
+                          </p>
+                          
+                          {/* Storage Info */}
+                          {(() => {
+                            const storage = getStorageUsage();
+                            const storagePercent = parseFloat(storage.percentage);
+                            return (
+                              <div className="mb-4 p-3 rounded-lg border border-gray-200 bg-[#FAF4EC]">
+                                <div className="text-sm font-medium text-[#36454F]">
+                                  Current Storage: {storage.usedMB}MB / {storage.totalMB}MB ({storage.percentage}%)
+                                </div>
+                              </div>
+                            );
+                          })()}
+                          
+                          {showMigrationButton && (
+                            <div className="bg-[#FAF4EC] border border-gray-200 rounded-lg p-4 mb-4">
+                              <p className="text-sm text-[#36454F] mb-2">
+                                ⚠️ Your property images can be optimized! Click the button below to compress all images to WebP format (max 50KB each).
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                This may take a few minutes depending on the number of properties.
+                              </p>
+                            </div>
+                          )}
+                          
+                          {isMigrating && (
+                            <div className="bg-[#FAF4EC] border border-gray-200 rounded-lg p-4 mb-4">
+                              <div className="flex items-center gap-3">
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#6B7F39]"></div>
+                                <div className="text-sm text-[#36454F]">
+                                  Migrating images... Property {migrationProgress.current} of {migrationProgress.total}
+                                </div>
+                              </div>
+                              <div className="mt-2 bg-gray-200 rounded-full h-2 overflow-hidden">
+                                <div 
+                                  className="bg-[#6B7F39] h-full transition-all duration-300"
+                                  style={{ width: `${(migrationProgress.current / migrationProgress.total) * 100}%` }}
+                                ></div>
+                              </div>
+                              <p className="text-xs text-gray-600 mt-2">
+                                Please don't close this page until migration is complete.
+                              </p>
+                            </div>
+                          )}
+                          
+                          <Button
+                            onClick={migrateExistingImages}
+                            disabled={isMigrating || !showMigrationButton || !isOnline}
+                            className={`w-full ${
+                              showMigrationButton && !isMigrating && isOnline
+                                ? 'bg-[#6B7F39] hover:bg-[#5a6b2f]'
+                                : 'bg-gray-300 cursor-not-allowed'
+                            } text-white`}
+                          >
+                            {isMigrating ? 'Migrating Images...' : 
+                             showMigrationButton ? 'Optimize All Images to WebP (50KB)' : 
+                             '✓ All Images Already Optimized'}
+                          </Button>
+                          
+                          <p className="text-xs text-gray-500 mt-3">
+                            💡 New images uploaded through "Add Property" are automatically optimized to WebP (50KB max).
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Data Management Tab */}
+                {settingsTab === 'data' && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg md:text-xl font-bold text-[#36454F]">Data Management</CardTitle>
+                      <p className="text-sm text-gray-600 mt-2">Manage and clear system data. These actions cannot be undone.</p>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {/* Warning Message */}
+                        <div className="bg-[#FAF4EC] border border-gray-200 rounded-lg p-4 flex items-start gap-3">
+                          <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-[#36454F] mb-1">Caution: Irreversible Actions</p>
+                            <p className="text-xs text-gray-600">
+                              These operations will permanently delete data from the database. Make sure you have backups before proceeding.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Clear Data Buttons */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Clear Properties */}
+                          <div className="border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-center gap-3 mb-3">
+                              <Building2 className="w-5 h-5 text-[#36454F]" />
+                              <div>
+                                <h4 className="font-semibold text-[#36454F]">Clear Properties</h4>
+                                <p className="text-xs text-gray-600">Remove all property listings</p>
+                              </div>
+                            </div>
+                            <Button
+                              onClick={() => {
+                                showModal('confirm', 'Clear All Properties?', 
+                                  `This will permanently delete all ${properties.length} properties from the database. This action cannot be undone.`,
+                                  async () => {
+                                    try {
+                                      await clearAllProperties();
+                                      setProperties([]);
+                                      showModal('success', 'Success', 'All properties have been cleared.');
+                                    } catch (error) {
+                                      console.error('Error clearing properties:', error);
+                                      showModal('error', 'Error', 'Failed to clear properties. Please try again.');
+                                    }
+                                  },
+                                  'Clear All',
+                                  'Cancel'
+                                );
+                              }}
+                              disabled={!isOnline || properties.length === 0}
+                              variant="outline"
+                              className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Clear All Properties ({properties.length})
+                            </Button>
+                          </div>
+
+                          {/* Clear Customers */}
+                          <div className="border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-center gap-3 mb-3">
+                              <Users className="w-5 h-5 text-[#36454F]" />
+                              <div>
+                                <h4 className="font-semibold text-[#36454F]">Clear Customers</h4>
+                                <p className="text-xs text-gray-600">Remove all customer records</p>
+                              </div>
+                            </div>
+                            <Button
+                              onClick={() => {
+                                showModal('confirm', 'Clear All Customers?', 
+                                  `This will permanently delete all ${customers.length} customers from the database. This action cannot be undone.`,
+                                  async () => {
+                                    try {
+                                      await clearAllCustomers();
+                                      setCustomers([]);
+                                      showModal('success', 'Success', 'All customers have been cleared.');
+                                    } catch (error) {
+                                      console.error('Error clearing customers:', error);
+                                      showModal('error', 'Error', 'Failed to clear customers. Please try again.');
+                                    }
+                                  },
+                                  'Clear All',
+                                  'Cancel'
+                                );
+                              }}
+                              disabled={!isOnline || customers.length === 0}
+                              variant="outline"
+                              className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Clear All Customers ({customers.length})
+                            </Button>
+                          </div>
+
+                          {/* Clear Bookings */}
+                          <div className="border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-center gap-3 mb-3">
+                              <Calendar className="w-5 h-5 text-[#36454F]" />
+                              <div>
+                                <h4 className="font-semibold text-[#36454F]">Clear Bookings</h4>
+                                <p className="text-xs text-gray-600">Remove all booking records</p>
+                              </div>
+                            </div>
+                            <Button
+                              onClick={() => {
+                                showModal('confirm', 'Clear All Bookings?', 
+                                  `This will permanently delete all ${bookings.length} bookings from the database. This action cannot be undone.`,
+                                  async () => {
+                                    try {
+                                      await clearAllBookings();
+                                      setBookings([]);
+                                      showModal('success', 'Success', 'All bookings have been cleared.');
+                                    } catch (error) {
+                                      console.error('Error clearing bookings:', error);
+                                      showModal('error', 'Error', 'Failed to clear bookings. Please try again.');
+                                    }
+                                  },
+                                  'Clear All',
+                                  'Cancel'
+                                );
+                              }}
+                              disabled={!isOnline || bookings.length === 0}
+                              variant="outline"
+                              className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Clear All Bookings ({bookings.length})
+                            </Button>
+                          </div>
+
+                          {/* Clear Payments */}
+                          <div className="border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-center gap-3 mb-3">
+                              <CreditCard className="w-5 h-5 text-[#36454F]" />
+                              <div>
+                                <h4 className="font-semibold text-[#36454F]">Clear Payments</h4>
+                                <p className="text-xs text-gray-600">Remove all payment records</p>
+                              </div>
+                            </div>
+                            <Button
+                              onClick={() => {
+                                showModal('confirm', 'Clear All Payments?', 
+                                  `This will permanently delete all ${payments.length} payments from the database. This action cannot be undone.`,
+                                  async () => {
+                                    try {
+                                      await clearAllPayments();
+                                      setPayments([]);
+                                      showModal('success', 'Success', 'All payments have been cleared.');
+                                    } catch (error) {
+                                      console.error('Error clearing payments:', error);
+                                      showModal('error', 'Error', 'Failed to clear payments. Please try again.');
+                                    }
+                                  },
+                                  'Clear All',
+                                  'Cancel'
+                                );
+                              }}
+                              disabled={!isOnline || payments.length === 0}
+                              variant="outline"
+                              className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Clear All Payments ({payments.length})
+                            </Button>
+                          </div>
+
+                          {/* Clear Activity Logs */}
+                          <div className="border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-center gap-3 mb-3">
+                              <Activity className="w-5 h-5 text-[#36454F]" />
+                              <div>
+                                <h4 className="font-semibold text-[#36454F]">Clear Activity Logs</h4>
+                                <p className="text-xs text-gray-600">Remove all activity log entries</p>
+                              </div>
+                            </div>
+                            <Button
+                              onClick={() => {
+                                showModal('confirm', 'Clear Activity Logs?', 
+                                  `This will permanently delete all ${activityLogs.length} activity log entries from the database. This action cannot be undone.`,
+                                  async () => {
+                                    try {
+                                      await deleteActivityLogs();
+                                      setActivityLogs([]);
+                                      showModal('success', 'Success', 'All activity logs have been cleared.');
+                                    } catch (error) {
+                                      console.error('Error clearing activity logs:', error);
+                                      showModal('error', 'Error', 'Failed to clear activity logs. Please try again.');
+                                    }
+                                  },
+                                  'Clear All',
+                                  'Cancel'
+                                );
+                              }}
+                              disabled={!isOnline || activityLogs.length === 0}
+                              variant="outline"
+                              className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Clear Activity Logs ({activityLogs.length})
+                            </Button>
+                          </div>
+
+                          {/* Reset System */}
+                          <div className="border border-gray-200 rounded-lg p-4 md:col-span-2">
+                            <div className="flex items-center gap-3 mb-3">
+                              <RefreshCw className="w-5 h-5 text-[#36454F]" />
+                              <div>
+                                <h4 className="font-semibold text-[#36454F]">Reset System to Default</h4>
+                                <p className="text-xs text-gray-600">Clear all data and reset the system to factory defaults</p>
+                              </div>
+                            </div>
+                            <Button
+                              onClick={() => {
+                                showModal('confirm', 'Reset System to Default?', 
+                                  'This will permanently delete ALL data including properties, customers, bookings, payments, and activity logs. This action cannot be undone.\n\nAre you absolutely sure?',
+                                  async () => {
+                                    try {
+                                      await Promise.all([
+                                        clearAllProperties(),
+                                        clearAllCustomers(),
+                                        clearAllBookings(),
+                                        clearAllPayments(),
+                                        deleteActivityLogs()
+                                      ]);
+                                      setProperties([]);
+                                      setCustomers([]);
+                                      setBookings([]);
+                                      setPayments([]);
+                                      setActivityLogs([]);
+                                      showModal('success', 'System Reset Complete', 'All data has been cleared. The system has been reset to default settings.');
+                                    } catch (error) {
+                                      console.error('Error resetting system:', error);
+                                      showModal('error', 'Error', 'Failed to reset system. Please try again.');
+                                    }
+                                  },
+                                  'Reset System',
+                                  'Cancel'
+                                );
+                              }}
+                              disabled={!isOnline}
+                              variant="outline"
+                              className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200 font-semibold"
+                            >
+                              <RefreshCw className="w-4 h-4 mr-2" />
+                              Reset System to Default Settings
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -3099,12 +3632,11 @@ export function AdminDashboard() {
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                <textarea
+                <RichTextEditor
                   value={propertyForm.description}
-                  onChange={(e) => setPropertyForm({...propertyForm, description: e.target.value})}
-                  placeholder="Enter property description"
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6B7F39]"
+                  onChange={(value) => setPropertyForm({...propertyForm, description: value})}
+                  placeholder="Enter property description with formatting..."
+                  minHeight="150px"
                 />
               </div>
 
@@ -3219,9 +3751,17 @@ export function AdminDashboard() {
             <div className="flex gap-3 mt-6">
               <Button
                 onClick={handleAddPropertySubmit}
-                className="flex-1 bg-[#6B7F39] hover:bg-[#5a6930] text-white"
+                disabled={isSavingProperty}
+                className="flex-1 bg-[#6B7F39] hover:bg-[#5a6930] text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Add Property
+                {isSavingProperty ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Saving Property...
+                  </>
+                ) : (
+                  'Add Property'
+                )}
               </Button>
               <Button
                 onClick={() => {
@@ -3382,12 +3922,11 @@ export function AdminDashboard() {
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                <textarea
+                <RichTextEditor
                   value={propertyForm.description}
-                  onChange={(e) => setPropertyForm({...propertyForm, description: e.target.value})}
-                  placeholder="Enter property description"
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6B7F39]"
+                  onChange={(value) => setPropertyForm({...propertyForm, description: value})}
+                  placeholder="Enter property description with formatting..."
+                  minHeight="150px"
                 />
               </div>
 
@@ -3502,9 +4041,17 @@ export function AdminDashboard() {
             <div className="flex gap-3 mt-6">
               <Button
                 onClick={handleEditPropertySubmit}
-                className="flex-1 bg-[#6B7F39] hover:bg-[#5a6930] text-white"
+                disabled={isUpdatingProperty}
+                className="flex-1 bg-[#6B7F39] hover:bg-[#5a6930] text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Update Property
+                {isUpdatingProperty ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Updating Property...
+                  </>
+                ) : (
+                  'Update Property'
+                )}
               </Button>
               <Button
                 onClick={() => {
@@ -3526,6 +4073,7 @@ export function AdminDashboard() {
                     others: []
                   });
                 }}
+                disabled={isUpdatingProperty}
                 variant="outline"
                 className="flex-1"
               >
@@ -3780,17 +4328,17 @@ export function AdminDashboard() {
                     return;
                   }
 
+                  // Set loading state
+                  setIsSavingPayment(true);
+
                   try {
                     // Save payment to Supabase
                     const paymentData = {
                       bookingId: selectedBooking.id,
-                      customerId: parseInt(selectedBooking.customerId),
-                      propertyId: parseInt(selectedBooking.propertyId),
                       paidAmount: parseFloat(paymentForm.paidAmount),
                       paymentMode: paymentForm.paymentMode,
                       transactionId: paymentForm.transactionId || '',
                       date: payment.date,
-                      mpesaCode: paymentForm.transactionId || '',
                       notes: ''
                     };
                     const createdPayment = await adminHelpers.addPayment(paymentData);
@@ -3808,10 +4356,22 @@ export function AdminDashboard() {
 
                     // Update local state
                     setBookings(updatedBookings);
-                    setPayments([...payments, createdPayment]);
+                    
+                    // Enrich the created payment with customer and property data
+                    const enrichedPayment = {
+                      ...createdPayment,
+                      customerName: selectedBooking.customerName,
+                      customerEmail: selectedBooking.customerEmail,
+                      customerPhone: selectedBooking.customerPhone,
+                      propertyName: selectedBooking.propertyName,
+                      balance: Math.max(0, selectedBooking.totalAmount - (parseFloat(paymentForm.paidAmount) + getBookingPaymentStatus(selectedBooking).totalPaid))
+                    };
+                    
+                    setPayments([...payments, enrichedPayment]);
                   } catch (error) {
                     console.error('Error adding payment:', error);
                     showModal('error', 'Error', 'Failed to add payment. Please try again.');
+                    setIsSavingPayment(false);
                     return;
                   }
 
@@ -3828,11 +4388,22 @@ export function AdminDashboard() {
                   // Trigger refresh of payments list
                   setPaymentsRefreshKey(prev => prev + 1);
                   
+                  // Reset loading state
+                  setIsSavingPayment(false);
+                  
                   showModal('success', 'Success', 'Payment added successfully!');
                 }}
-                className="flex-1 bg-[#6B7F39] hover:bg-[#5a6930] text-white"
+                disabled={isSavingPayment}
+                className="flex-1 bg-[#6B7F39] hover:bg-[#5a6930] text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Add Payment
+                {isSavingPayment ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Processing Payment...
+                  </>
+                ) : (
+                  'Add Payment'
+                )}
               </Button>
               <Button
                 onClick={() => {
@@ -4033,7 +4604,7 @@ export function AdminDashboard() {
                             KSh {(payment.balance || 0).toLocaleString()}
                           </td>
                           <td className="py-3 px-2 text-sm text-gray-600">
-                            {new Date(payment.createdAt).toLocaleDateString('en-GB', {
+                            {new Date(payment.date).toLocaleDateString('en-GB', {
                               day: '2-digit',
                               month: 'short',
                               year: 'numeric'
@@ -4122,6 +4693,107 @@ export function AdminDashboard() {
                 onClick={() => {
                   setShowDeleteConfirm(false);
                   setSelectedBooking(null);
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Property Confirmation Modal */}
+      {showDeleteConfirm && selectedProperty && !selectedBooking && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md my-8 relative">
+            <button
+              onClick={() => {
+                setShowDeleteConfirm(false);
+                setSelectedProperty(null);
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-red-100 p-3 rounded-full">
+                <Trash2 className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-[#36454F]">Delete Property</h3>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-600 mb-4">Are you sure you want to delete this property? This action cannot be undone.</p>
+              <div className="p-4 bg-[#FAF4EC] rounded-lg border-l-4 border-red-500">
+                <p className="font-semibold text-[#36454F] mb-1">{selectedProperty.name}</p>
+                <p className="text-sm text-gray-600 flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  {selectedProperty.location}
+                </p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Price: KSh {selectedProperty.price.toLocaleString()}/day
+                </p>
+              </div>
+              
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  <strong>Warning:</strong> Deleting this property will not affect existing bookings or payment records.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                onClick={async () => {
+                  if (!checkConnection()) {
+                    showModal('error', 'No Connection', 'Cannot delete property. Please check your internet connection.');
+                    return;
+                  }
+
+                  try {
+                    // Delete property from Supabase
+                    await deleteProperty(selectedProperty.id);
+                    
+                    // Update local state
+                    const updatedProperties = properties.filter(p => p.id !== selectedProperty.id);
+                    setProperties(updatedProperties);
+                    
+                    // Log activity
+                    try {
+                      await createActivityLog({
+                        user_id: user?.id || null,
+                        user_name: user?.name || 'Unknown',
+                        user_role: user?.role || 'Unknown',
+                        activity: `Deleted property: ${selectedProperty.name}`,
+                        activity_type: 'delete',
+                        entity_type: 'property',
+                        entity_id: selectedProperty.id,
+                        ip_address: null,
+                        user_agent: navigator.userAgent
+                      });
+                    } catch (logError) {
+                      console.error('Failed to log activity:', logError);
+                    }
+                    
+                    setShowDeleteConfirm(false);
+                    setSelectedProperty(null);
+                    
+                    showModal('success', 'Property Deleted', 'Property has been deleted successfully!');
+                  } catch (error) {
+                    console.error('Error deleting property:', error);
+                    showModal('error', 'Error', 'Failed to delete property. Please try again.');
+                  }
+                }}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              >
+                Yes, Delete Property
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setSelectedProperty(null);
                 }}
                 variant="outline"
                 className="flex-1"
@@ -5097,10 +5769,17 @@ export function AdminDashboard() {
             <div className="flex gap-3 mt-6">
               <Button
                 onClick={handleAddBooking}
-                className="flex-1 bg-[#6B7F39] hover:bg-[#5a6930] text-black font-semibold"
-                disabled={!bookingForm.propertyId || !bookingForm.customerId || !bookingForm.checkIn || !bookingForm.checkOut || calculatedDays <= 0}
+                className="flex-1 bg-[#6B7F39] hover:bg-[#5a6930] text-black font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!bookingForm.propertyId || !bookingForm.customerId || !bookingForm.checkIn || !bookingForm.checkOut || calculatedDays <= 0 || isSavingBooking}
               >
-                Book Now
+                {isSavingBooking ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
+                    Creating Booking...
+                  </>
+                ) : (
+                  'Book Now'
+                )}
               </Button>
               <Button
                 onClick={() => {
@@ -5159,7 +5838,7 @@ export function AdminDashboard() {
               <div className="grid grid-cols-3 gap-4 py-3 border-b">
                 <div className="text-sm font-medium text-gray-500">Date:</div>
                 <div className="col-span-2 text-sm text-gray-900 font-medium">
-                  {new Date(selectedPayment.createdAt).toLocaleDateString('en-GB', {
+                  {new Date(selectedPayment.date).toLocaleDateString('en-GB', {
                     day: '2-digit',
                     month: 'long',
                     year: 'numeric'
@@ -5341,7 +6020,7 @@ export function AdminDashboard() {
                 <div className="flex justify-between">
                   <span className="text-sm font-medium text-gray-700">Date:</span>
                   <span className="text-sm text-gray-900">
-                    {new Date(selectedPayment.createdAt).toLocaleDateString()}
+                    {new Date(selectedPayment.date).toLocaleDateString()}
                   </span>
                 </div>
               </div>
@@ -5639,7 +6318,7 @@ export function AdminDashboard() {
                               <div>
                                 <p className="text-sm text-gray-600">Payment Date:</p>
                                 <p className="font-semibold text-[#36454F]">
-                                  {new Date(receiptData.payment.createdAt).toLocaleDateString('en-US', { 
+                                  {new Date(receiptData.payment.date).toLocaleDateString('en-US', { 
                                     year: 'numeric', 
                                     month: 'long', 
                                     day: 'numeric' 

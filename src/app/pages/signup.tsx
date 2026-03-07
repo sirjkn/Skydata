@@ -4,10 +4,14 @@ import { Eye, EyeOff, Building2, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { CustomModal } from '../components/custom-modal';
+import { createCustomer, fetchCustomers } from '../../lib/supabaseData';
+import { createAuthUser, fetchAuthUserByEmail } from '../../lib/supabaseData';
+import { login } from '../lib/auth';
 
 export function Signup() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [customerForm, setCustomerForm] = useState({
     name: '',
     phone: '',
@@ -65,7 +69,7 @@ export function Signup() {
     closeModal();
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
@@ -84,52 +88,70 @@ export function Signup() {
       return;
     }
 
-    // Get existing customers
-    const customers = JSON.parse(localStorage.getItem('skyway_customers') || '[]');
-
-    // Check if email already exists
-    const existingCustomer = customers.find(
-      (c: any) => c.email.toLowerCase() === customerForm.email.toLowerCase()
-    );
-
-    if (existingCustomer) {
-      showModal('error', 'Email Already Exists', 'An account with this email already exists. Please login instead.');
+    if (customerForm.password.length < 6) {
+      showModal('error', 'Password Too Short', 'Password must be at least 6 characters long');
       return;
     }
 
-    // Create new customer
-    const newCustomer = {
-      id: Date.now().toString(),
-      name: customerForm.name.trim(),
-      phone: customerForm.phone.trim(),
-      email: customerForm.email.trim(),
-      address: customerForm.address.trim(),
-      password: customerForm.password.trim(),
-      role: 'customer',
-      createdAt: new Date().toISOString()
-    };
+    setIsLoading(true);
 
-    // Save customer
-    const updatedCustomers = [...customers, newCustomer];
-    localStorage.setItem('skyway_customers', JSON.stringify(updatedCustomers));
+    try {
+      // Check if email already exists in auth table
+      const existingUser = await fetchAuthUserByEmail(customerForm.email.trim().toLowerCase());
 
-    // Auto-login: Save user to auth
-    const userForAuth = {
-      id: newCustomer.id,
-      name: newCustomer.name,
-      email: newCustomer.email,
-      phone: newCustomer.phone,
-      role: 'customer'
-    };
-    localStorage.setItem('skyway_auth_user', JSON.stringify(userForAuth));
+      if (existingUser) {
+        showModal('error', 'Email Already Exists', 'An account with this email already exists. Please login instead.');
+        setIsLoading(false);
+        return;
+      }
 
-    // Dispatch auth change event
-    window.dispatchEvent(new Event('authChange'));
+      // Create customer record
+      const customerData = {
+        customer_name: customerForm.name.trim(),
+        phone: customerForm.phone.trim() || '',
+        email: customerForm.email.trim().toLowerCase(),
+        address: customerForm.address.trim() || null,
+        password: customerForm.password.trim(),
+        id_number: null,
+        profile_photo: null,
+        notes: null,
+        is_active: true
+      };
 
-    showModal('success', 'Account Created Successfully', 'You are now logged in and can start booking properties.', () => {
-      // Navigate to home
-      navigate('/');
-    });
+      const newCustomer = await createCustomer(customerData);
+
+      // Create auth user record
+      const authUserData = {
+        customer_name: customerForm.name.trim(),
+        email: customerForm.email.trim().toLowerCase(),
+        phone: customerForm.phone.trim() || null,
+        password: customerForm.password.trim(),
+        role: 'Customer' as const,
+        is_active: true,
+        last_login: null
+      };
+
+      await createAuthUser(authUserData);
+
+      // Auto-login the user
+      login({
+        user_id: newCustomer.customer_id!,
+        customer_name: newCustomer.customer_name,
+        email: newCustomer.email,
+        phone: newCustomer.phone,
+        role: 'Customer'
+      });
+
+      setIsLoading(false);
+
+      showModal('success', 'Account Created Successfully', 'Welcome to Skyway Suites! You can now start booking properties.', () => {
+        navigate('/');
+      });
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      setIsLoading(false);
+      showModal('error', 'Error Creating Account', error.message || 'An error occurred while creating your account. Please try again.');
+    }
   };
 
   return (
@@ -246,8 +268,9 @@ export function Signup() {
               <Button
                 type="submit"
                 className="w-full bg-[#6B7F39] hover:bg-[#5a6930] text-white py-2.5"
+                disabled={isLoading}
               >
-                Create Account
+                {isLoading ? 'Creating Account...' : 'Create Account'}
               </Button>
 
               <div className="text-center pt-4 border-t">

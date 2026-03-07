@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { Building2, LogOut, Menu, X, ExternalLink } from 'lucide-react';
+import { Building2, LogOut, Menu, X, ExternalLink, Home } from 'lucide-react';
 import { Button } from './ui/button';
 import { getCurrentUser, logout, isAdmin } from '../lib/auth';
 import { fetchMenuPages } from '../../lib/supabaseData';
@@ -35,13 +35,19 @@ export function Header() {
       try {
         const pages = await fetchMenuPages();
         // Convert Supabase menu pages to menu items format
-        const items = pages.map(page => ({
-          id: page.page_id,
-          title: page.page_name,
-          slug: page.page_slug,
-          type: 'custom',
-          showInMenu: true
-        }));
+        const items = pages.map(page => {
+          // Check if this is an internal link or custom page
+          const isInternalLink = page.page_slug.startsWith('/');
+          
+          return {
+            id: page.page_id,
+            title: page.page_name,
+            slug: page.page_slug,
+            type: isInternalLink ? 'internal' : 'custom',
+            url: isInternalLink ? page.page_slug : undefined,
+            showInMenu: true
+          };
+        });
         setMenuItems(items);
       } catch (error) {
         console.error('Failed to load menu items:', error);
@@ -78,7 +84,7 @@ export function Header() {
   };
 
   return (
-    <header className="bg-[#36454F] text-white sticky top-0 z-50 shadow-lg">
+    <header className="bg-gradient-to-r from-[#36454F] to-[#6B7F39] text-white sticky top-0 z-50 shadow-lg">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <div 
@@ -100,7 +106,7 @@ export function Header() {
               <button
                 key={item.id}
                 onClick={() => handleMenuItemClick(item)}
-                className="text-white hover:text-[#6B7F39] transition-colors font-medium flex items-center gap-1"
+                className="text-white hover:text-[#FAF4EC] transition-colors font-medium flex items-center gap-1"
               >
                 {item.title}
                 {item.type === 'external' && <ExternalLink className="w-3 h-3" />}
@@ -143,6 +149,16 @@ export function Header() {
                   <p className="text-xs text-gray-300">{user.email}</p>
                 </div>
                 
+                {/* Mobile: Back Home Button */}
+                <Button
+                  onClick={() => navigate('/')}
+                  variant="outline"
+                  className="md:hidden border-white text-black bg-white hover:bg-gray-100"
+                >
+                  <Home className="w-4 h-4 mr-2" />
+                  <span>Home</span>
+                </Button>
+                
                 <Button
                   onClick={handleLogout}
                   variant="outline"
@@ -180,7 +196,7 @@ export function Header() {
                 <button
                   key={item.id}
                   onClick={() => handleMenuItemClick(item)}
-                  className="text-white hover:text-[#6B7F39] transition-colors font-medium text-left flex items-center gap-2 py-2"
+                  className="text-white hover:text-[#FAF4EC] transition-colors font-medium text-left flex items-center gap-2 py-2"
                 >
                   {item.title}
                   {item.type === 'external' && <ExternalLink className="w-3 h-3" />}

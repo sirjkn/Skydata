@@ -65,6 +65,7 @@ export function PropertyDetails() {
   const navigate = useNavigate();
   const [properties, setProperties] = useState<any[]>([]);
   const [property, setProperty] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   const [bookings, setBookings] = useState<any[]>([]);
@@ -78,6 +79,7 @@ export function PropertyDetails() {
   
   // Booking Modal states
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [bookingForm, setBookingForm] = useState({
     propertyId: '',
     propertyName: '',
@@ -143,13 +145,27 @@ export function PropertyDetails() {
   // Load properties and check user login status
   useEffect(() => {
     const loadData = async () => {
+      setIsLoading(true);
       try {
-        const [loadedProperties, loadedBookings, loadedCustomers] = await Promise.all([
+        // Load properties and bookings first (essential data)
+        const [loadedProperties, loadedBookings] = await Promise.all([
           fetchProperties(),
-          fetchBookings(),
-          fetchCustomers()
+          fetchBookings()
         ]);
+        
         const loggedInUser = getCurrentUser();
+        
+        // Load customers separately (only needed for admin, non-blocking)
+        let loadedCustomers: any[] = [];
+        if (loggedInUser && isAdmin(loggedInUser)) {
+          try {
+            loadedCustomers = await fetchCustomers();
+          } catch (customerError) {
+            console.error('Error fetching customers:', customerError);
+            // Don't block page load if customers fail to load
+            // Admin can still view property but won't be able to book for others
+          }
+        }
         
         // Convert Supabase format to app format
         const formattedProperties = loadedProperties.map(p => ({
@@ -220,11 +236,26 @@ export function PropertyDetails() {
         }
       } catch (error) {
         console.error('Failed to load data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     loadData();
   }, [id]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#FAF4EC] flex items-center justify-center relative">
+        <div className="absolute inset-0 backdrop-blur-sm bg-white/30"></div>
+        <div className="text-center relative z-10">
+          <div className="w-20 h-20 mx-auto mb-6 border-4 border-[#6B7F39] border-t-transparent rounded-full animate-spin"></div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-3">Loading Property</h1>
+          <p className="text-gray-600">Please wait while we load the property details...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!property) {
     return (
@@ -256,7 +287,11 @@ export function PropertyDetails() {
     swipe: true,
     swipeToSlide: true,
     touchThreshold: 10,
-    adaptiveHeight: false
+    adaptiveHeight: false,
+    autoplay: true,
+    autoplaySpeed: 4000,
+    pauseOnHover: true,
+    cssEase: 'ease-in-out'
   };
 
   const getAmenityIcon = (amenity: string) => {
@@ -289,6 +324,9 @@ export function PropertyDetails() {
   const { days: calculatedDays, totalAmount: calculatedAmount } = calculateModalBookingDetails();
 
   const handleAddBooking = async () => {
+    // Prevent double submission
+    if (isSubmittingBooking) return;
+    
     // Validate required fields
     if (!bookingForm.propertyId || !bookingForm.customerId || !bookingForm.checkIn || !bookingForm.checkOut) {
       showModal('error', 'Incomplete Information', 'Please fill in all required fields!');
@@ -301,11 +339,11 @@ export function PropertyDetails() {
       return;
     }
     
-    // Check for double booking - Same logic as Admin Dashboard
+    // Check for double booking - Enhanced with detailed availability information
     const requestedCheckIn = new Date(bookingForm.checkIn);
     const requestedCheckOut = new Date(bookingForm.checkOut);
     
-    const conflictingBooking = bookings.find((b: any) => {
+    const conflictingBookings = bookings.filter((b: any) => {
       // Only check bookings for this specific property using property ID
       if (String(b.propertyId) !== String(bookingForm.propertyId)) return false;
       
@@ -326,13 +364,43 @@ export function PropertyDetails() {
       );
     });
     
-    if (conflictingBooking) {
-      const conflictCheckOut = new Date(conflictingBooking.checkOut).toLocaleDateString();
-      const conflictBookingId = conflictingBooking.id;
+    if (conflictingBookings.length > 0) {
+      // Find the latest checkout date from all conflicting bookings
+      const latestCheckout = conflictingBookings.reduce((latest: Date, booking: any) => {
+        const checkoutDate = new Date(booking.checkOut);
+        return checkoutDate > latest ? checkoutDate : latest;
+      }, new Date(conflictingBookings[0].checkOut));
+      
+      const availableAfterDate = latestCheckout.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+      
       showModal(
         'error', 
         'Property Already Booked', 
-        `This property is already booked during the selected dates.\n\nBooking ID: ${conflictBookingId}\nProperty: ${bookingForm.propertyName}\nBooked by: ${conflictingBooking.customerName}\nStatus: ${conflictingBooking.status}\n\nThe property will be available after ${conflictCheckOut}.\n\nPlease select different dates.`
+        `This property is already booked during the selected dates. The property will be available after ${availableAfterDate}.`,
+        () => {
+          // Close the booking modal when user clicks OK
+          setShowBookingModal(false);
+          setBookingForm({
+            propertyId: '',
+            propertyName: '',
+            propertyPrice: 0,
+            customerId: '',
+            customerName: '',
+            customerEmail: '',
+            customerPhone: '',
+            checkIn: '',
+            checkOut: '',
+            numberOfPeople: '1'
+          });
+          setCustomerSearchTerm('');
+          setShowCustomerDropdown(false);
+        },
+        'OK'
       );
       return;
     }
@@ -352,6 +420,9 @@ export function PropertyDetails() {
       notes: `Number of people: ${bookingForm.numberOfPeople}`,
       created_by: currentUser ? parseInt(currentUser.id) : null
     };
+    
+    // Set loading state
+    setIsSubmittingBooking(true);
     
     try {
       const createdBooking = await createBooking(newBookingData);
@@ -415,6 +486,9 @@ export function PropertyDetails() {
           ? 'No internet connection. Please check your connection and try again.'
           : 'Failed to create booking. Please try again.'
       );
+    } finally {
+      // Reset loading state
+      setIsSubmittingBooking(false);
     }
   };
 
@@ -442,75 +516,110 @@ export function PropertyDetails() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-4 md:py-8 max-w-7xl">
-        <div className="grid lg:grid-cols-3 gap-4 md:gap-8">
+        <div className="grid lg:grid-cols-3 gap-4 md:gap-6">
           {/* Left Column - Property Details */}
-          <div className="lg:col-span-2 space-y-4 md:space-y-6">
+          <div className="lg:col-span-2 space-y-4">
             {/* Image Gallery */}
-            <Card className="overflow-hidden">
-              <div className="relative h-[250px] sm:h-[350px] md:h-[500px]">
-                <Slider {...propertyImageSettings}>
-                  {propertyImages.length > 0 ? (
-                    propertyImages.map((image, index) => (
-                      <div key={index}>
-                        <img
-                          src={image}
-                          alt={`${property.name} - Image ${index + 1}`}
-                          className="w-full h-[250px] sm:h-[350px] md:h-[500px] object-cover"
-                        />
+            <Card className="overflow-hidden shadow-xl">
+              <div className="relative h-[300px] sm:h-[400px] md:h-[450px] w-full">
+                <div className="absolute inset-0">
+                  <Slider {...propertyImageSettings}>
+                    {propertyImages.length > 0 ? (
+                      propertyImages.map((image, index) => (
+                        <div key={index} className="h-[300px] sm:h-[400px] md:h-[450px]">
+                          <img
+                            src={image}
+                            alt={`${property.name} - Image ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))
+                    ) : (
+                      <div className="w-full h-[300px] sm:h-[400px] md:h-[450px] bg-gray-300 flex items-center justify-center">
+                        <p className="text-gray-500">No images available</p>
                       </div>
-                    ))
-                  ) : (
-                    <div className="w-full h-[250px] sm:h-[350px] md:h-[500px] bg-gray-300 flex items-center justify-center">
-                      <p className="text-gray-500">No images available</p>
-                    </div>
-                  )}
-                </Slider>
+                    )}
+                  </Slider>
+                </div>
+                {/* Floating Price Badge */}
+                <div className="absolute bottom-4 right-4 bg-red-600 text-white px-4 py-2.5 rounded-lg shadow-lg border-2 border-red-700">
+                  <div className="text-2xl font-bold">KSh {property.price.toLocaleString()}</div>
+                  <div className="text-xs text-center font-medium">per day</div>
+                </div>
+                {/* Status Badge */}
+                {propertyIsBooked && (
+                  <div className="absolute top-4 left-4 bg-orange-500 text-white px-4 py-2 rounded-lg shadow-lg font-semibold">
+                    Booked - Available {availableFromDate}
+                  </div>
+                )}
               </div>
             </Card>
 
-            {/* Property Info */}
-            <Card>
-              <CardContent className="p-4 md:p-6 lg:p-8">
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
-                  <div className="flex-1 min-w-0">
-                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#36454F] mb-2 break-words">
-                      {property.name}
-                    </h1>
-                    <div className="flex items-center text-gray-600 mb-2">
-                      <MapPin className="w-4 h-4 md:w-5 md:h-5 mr-2 flex-shrink-0" />
-                      <span className="text-base md:text-lg break-words">{property.location}</span>
-                    </div>
-                  </div>
-                  <div className="bg-[#D4C5B0] text-[#36454F] px-3 md:px-4 py-2 rounded-lg flex-shrink-0 self-start md:self-auto border border-[#B8A586]">
-                    <div className="text-lg md:text-xl font-bold whitespace-nowrap">KSh {property.price.toLocaleString()}</div>
-                    <div className="text-xs text-center text-gray-700">per day</div>
-                  </div>
+            {/* Property Header & Quick Stats */}
+            <Card className="shadow-lg">
+              <CardContent className="p-5 md:p-6">
+                <h1 className="text-2xl sm:text-3xl font-bold text-[#36454F] mb-3">
+                  {property.name}
+                </h1>
+                <div className="flex items-center text-gray-600 mb-4">
+                  <MapPin className="w-5 h-5 mr-2 text-[#6B7F39]" />
+                  <span className="text-lg">{property.location}</span>
                 </div>
 
+                {/* Quick Stats Grid */}
+                <div className="grid grid-cols-3 gap-3 p-4 bg-gradient-to-br from-[#FAF4EC] to-[#f5ede3] rounded-xl border border-gray-200">
+                  <div className="text-center p-3 bg-white rounded-lg shadow-sm">
+                    <Bed className="w-6 h-6 mx-auto mb-2 text-[#6B7F39]" />
+                    <div className="text-2xl font-bold text-[#36454F]">{property.beds || 0}</div>
+                    <div className="text-xs text-gray-600 font-medium">Bedrooms</div>
+                  </div>
+                  <div className="text-center p-3 bg-white rounded-lg shadow-sm">
+                    <Bath className="w-6 h-6 mx-auto mb-2 text-[#6B7F39]" />
+                    <div className="text-2xl font-bold text-[#36454F]">{property.baths || 0}</div>
+                    <div className="text-xs text-gray-600 font-medium">Bathrooms</div>
+                  </div>
+                  <div className="text-center p-3 bg-white rounded-lg shadow-sm">
+                    <Maximize className="w-6 h-6 mx-auto mb-2 text-[#6B7F39]" />
+                    <div className="text-2xl font-bold text-[#36454F]">{property.area || 0}</div>
+                    <div className="text-xs text-gray-600 font-medium">Sqft</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Description & Amenities Combined */}
+            <Card className="shadow-lg">
+              <CardContent className="p-5 md:p-6 space-y-5">
                 {/* Description */}
-                <div className="mb-4 md:mb-6">
-                  <h2 className="text-xl md:text-2xl font-bold text-[#36454F] mb-3 md:mb-4">About this property</h2>
-                  <p className="text-gray-700 text-sm md:text-base lg:text-lg leading-relaxed">
+                <div>
+                  <h2 className="text-xl font-bold text-[#36454F] mb-3 flex items-center gap-2">
+                    <Building2 className="w-5 h-5 text-[#6B7F39]" />
+                    About this property
+                  </h2>
+                  <p className="text-gray-700 leading-relaxed">
                     {property.description}
                   </p>
                 </div>
 
                 {/* Amenities */}
-                <div>
-                  <h2 className="text-xl md:text-2xl font-bold text-[#36454F] mb-3 md:mb-4">Amenities</h2>
-                  <div className="flex flex-col gap-2 md:gap-3">
+                <div className="pt-4 border-t border-gray-200">
+                  <h2 className="text-xl font-bold text-[#36454F] mb-3 flex items-center gap-2">
+                    <Wifi className="w-5 h-5 text-[#6B7F39]" />
+                    Amenities & Features
+                  </h2>
+                  <div className="flex flex-wrap gap-2">
                     {property.features && property.features.length > 0 ? (
                       property.features.map((amenity: string) => {
                         const Icon = getAmenityIcon(amenity);
                         return (
-                          <div key={amenity} className="flex items-center gap-2 md:gap-3 p-2 md:p-3 bg-[#FAF4EC] rounded-lg">
-                            <Icon className="w-4 h-4 md:w-5 md:h-5 text-[#6B7F39] flex-shrink-0" />
-                            <span className="text-gray-700 font-medium text-sm md:text-base break-words">{amenity}</span>
+                          <div key={amenity} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FAF4EC] rounded-full border border-gray-200 hover:border-[#6B7F39] hover:shadow-md transition-all">
+                            <Icon className="w-4 h-4 text-[#6B7F39] flex-shrink-0" />
+                            <span className="text-xs font-medium text-gray-700">{amenity}</span>
                           </div>
                         );
                       })
                     ) : (
-                      <p className="text-gray-500 text-sm md:text-base">No amenities listed for this property.</p>
+                      <p className="text-gray-500 w-full text-center py-4">No amenities listed for this property.</p>
                     )}
                   </div>
                 </div>
@@ -520,62 +629,43 @@ export function PropertyDetails() {
 
           {/* Right Column - Booking Card */}
           <div className="lg:col-span-1">
-            <Card className="lg:sticky lg:top-24">
-              <CardContent className="p-4 md:p-6">
-                <h3 className="text-xl md:text-2xl font-bold text-[#36454F] mb-4 md:mb-6">Book This Property</h3>
+            <Card className="lg:sticky lg:top-24 shadow-xl border-2 border-gray-200">
+              <CardContent className="p-5 space-y-4">
+                {/* Header */}
+                <div className="text-center pb-4 border-b border-gray-200">
+                  <Calendar className="w-10 h-10 mx-auto mb-2 text-[#6B7F39]" />
+                  <h3 className="text-xl font-bold text-[#36454F]">Book This Property</h3>
+                </div>
                 
-                {/* Property Availability Status - Same as Admin Dashboard */}
-                <div className="mb-4 md:mb-6">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-700 font-medium">Status:</span>
-                    <span className={`px-2 py-0.5 rounded text-xs whitespace-nowrap ${
-                      propertyIsBooked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-                    }`}>
-                      {propertyIsBooked ? `Booked, Available from ${availableFromDate}` : 'Available for booking'}
-                    </span>
-                  </div>
+                {/* Property Availability Status */}
+                <div className={`p-3 rounded-lg text-center font-semibold ${
+                  propertyIsBooked ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'
+                }`}>
+                  {propertyIsBooked ? `Booked until ${availableFromDate}` : '✓ Available Now'}
                 </div>
 
-                {/* Property Stats */}
-                <div className="grid grid-cols-3 gap-2 md:gap-3 mb-4 md:mb-6 py-3 md:py-4 border-t border-b border-gray-200">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1 md:mb-2">
-                      <Bed className="w-4 h-4 md:w-5 md:h-5 text-[#6B7F39]" />
-                    </div>
-                    <div className="text-lg md:text-xl font-bold text-[#36454F]">{property.beds || 0}</div>
-                    <div className="text-xs text-gray-600">No. of Beds</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1 md:mb-2">
-                      <Bath className="w-4 h-4 md:w-5 md:h-5 text-[#6B7F39]" />
-                    </div>
-                    <div className="text-lg md:text-xl font-bold text-[#36454F]">{property.baths || 0}</div>
-                    <div className="text-xs text-gray-600">Bathrooms</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1 md:mb-2">
-                      <Maximize className="w-4 h-4 md:w-5 md:h-5 text-[#6B7F39]" />
-                    </div>
-                    <div className="text-lg md:text-xl font-bold text-[#36454F]">{property.area || 0}</div>
-                    <div className="text-xs text-gray-600">Area in Sqft</div>
-                  </div>
+                {/* Pricing Display */}
+                <div className="bg-gradient-to-br from-[#FAF4EC] to-[#f5ede3] p-4 rounded-xl text-center border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-1">Daily Rate</p>
+                  <p className="text-3xl font-bold text-[#36454F]">KSh {property.price.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500 mt-1">per day</p>
                 </div>
                 
                 {/* Show login prompt if user is not logged in */}
                 {!currentUser ? (
-                  <div className="text-center py-6 space-y-4">
-                    <p className="text-gray-600 text-sm md:text-base">
+                  <div className="text-center py-4 space-y-3">
+                    <p className="text-gray-600 text-sm">
                       Please log in to book this property
                     </p>
                     <Button
                       onClick={() => navigate('/login')}
-                      className="w-full bg-[#6B7F39] hover:bg-[#5a6930] text-base md:text-lg py-5 md:py-6 text-black font-semibold"
+                      className="w-full bg-[#6B7F39] hover:bg-[#5a6930] text-lg py-6 text-black font-semibold shadow-lg"
                     >
                       Log in to Book
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <Button
                       onClick={() => {
                         // Open booking modal with property pre-filled
@@ -593,10 +683,30 @@ export function PropertyDetails() {
                         });
                         setShowBookingModal(true);
                       }}
-                      className="w-full bg-[#6B7F39] hover:bg-[#5a6930] text-black font-semibold py-5 md:py-6 text-base md:text-lg"
+                      className="w-full bg-[#6B7F39] hover:bg-[#5a6930] text-white font-bold py-6 text-lg shadow-lg hover:shadow-xl transition-all"
                     >
-                      Book Property
+                      Book Now
                     </Button>
+                    
+                    {/* Contact Options */}
+                    <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-200">
+                      <a
+                        href={`tel:+254700000000`}
+                        className="flex items-center justify-center gap-2 p-3 bg-[#FAF4EC] hover:bg-[#f5ede3] rounded-lg transition-colors border border-gray-200"
+                      >
+                        <Phone className="w-4 h-4 text-[#6B7F39]" />
+                        <span className="text-xs font-semibold text-gray-700">Call</span>
+                      </a>
+                      <a
+                        href={`https://wa.me/254700000000`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
+                      >
+                        <MessageCircle className="w-4 h-4 text-green-600" />
+                        <span className="text-xs font-semibold text-green-700">WhatsApp</span>
+                      </a>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -790,10 +900,17 @@ export function PropertyDetails() {
               <div className="flex gap-3 mt-6">
                 <Button
                   onClick={handleAddBooking}
-                  className="flex-1 bg-[#6B7F39] hover:bg-[#5a6930] text-black font-semibold"
-                  disabled={!bookingForm.propertyId || !bookingForm.customerId || !bookingForm.checkIn || !bookingForm.checkOut || calculatedDays <= 0}
+                  className="flex-1 bg-[#6B7F39] hover:bg-[#5a6930] text-black font-semibold flex items-center justify-center gap-2"
+                  disabled={!bookingForm.propertyId || !bookingForm.customerId || !bookingForm.checkIn || !bookingForm.checkOut || calculatedDays <= 0 || isSubmittingBooking}
                 >
-                  Book Now
+                  {isSubmittingBooking ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Adding Booking...</span>
+                    </>
+                  ) : (
+                    'Book Now'
+                  )}
                 </Button>
                 <Button
                   onClick={() => {
@@ -814,6 +931,7 @@ export function PropertyDetails() {
                     setShowCustomerDropdown(false);
                   }}
                   className="px-6 bg-gray-200 hover:bg-gray-300 text-[#36454F] font-semibold"
+                  disabled={isSubmittingBooking}
                 >
                   Cancel
                 </Button>
