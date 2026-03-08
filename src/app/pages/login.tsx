@@ -140,8 +140,20 @@ export function Login() {
                 </Button>
               </form>
 
-              <div className="mt-6 text-center border-t pt-4">
-                <p className="text-sm text-gray-600">
+              <div className="mt-6 text-center">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => navigate('/')}
+                  className="text-gray-600 hover:text-[#6B7F39]"
+                >
+                  Back to Home
+                </Button>
+              </div>
+
+              {/* Create Account Link */}
+              <div className="mt-4 text-center pt-4 border-t">
+                <p className="text-sm text-gray-600 mb-2">
                   Don't have an account?{' '}
                   <button
                     type="button"
@@ -151,17 +163,16 @@ export function Login() {
                     Create Account
                   </button>
                 </p>
-              </div>
-
-              <div className="mt-4 text-center">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => navigate('/')}
-                  className="text-gray-600 hover:text-[#6B7F39]"
-                >
-                  Back to Home
-                </Button>
+                <p className="text-xs text-gray-500">
+                  First time setup?{' '}
+                  <button
+                    type="button"
+                    onClick={() => navigate('/setup')}
+                    className="text-[#6B7F39] hover:text-[#5a6930] font-semibold underline"
+                  >
+                    Initialize Database
+                  </button>
+                </p>
               </div>
             </CardContent>
           </Card>

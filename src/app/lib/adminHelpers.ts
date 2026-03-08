@@ -23,7 +23,8 @@ import {
   createCategory,
   deleteCategory,
   createFeature,
-  deleteFeature
+  deleteFeature,
+  createActivityLog
 } from '../../lib/supabaseData';
 
 // ============================================================================
@@ -304,4 +305,20 @@ export async function removeFeature(featureName: string) {
   if (featureObj) {
     await deleteFeature(featureObj.feature_id);
   }
+}
+
+// ============================================================================
+// ACTIVITY LOG HELPER
+// ============================================================================
+
+export async function logActivity(userId: number, userName: string, userRole: string, activity: string, activityType: string, entityType: string, entityId?: number) {
+  await createActivityLog({
+    user_id: userId,
+    user_name: userName,
+    user_role: userRole,
+    activity: activity,
+    activity_type: activityType,
+    entity_type: entityType,
+    entity_id: entityId
+  });
 }

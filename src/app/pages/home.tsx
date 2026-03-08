@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { fetchProperties, fetchBookings, fetchCategories } from '../../lib/cachedSupabaseData';
+import { fetchProperties, fetchBookings, fetchCategories } from '../../lib/supabaseData';
 import { getHomePageSettings, getGeneralSettings } from '../lib/settingsHelpers';
-import { SEOHead } from '../components/seo-head';
+import { ConnectionStatusBanner } from '../components/connection-status';
 import Slider from 'react-slick';
 import { 
   Shield, 
@@ -20,7 +20,8 @@ import {
   Mail,
   MessageCircle,
   Home as HomeIcon,
-  Headset
+  Headset,
+  Globe
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -236,13 +237,11 @@ export function Home() {
   const heroSettings = {
     dots: true,
     infinite: true,
-    speed: 300,
+    speed: 800,
     slidesToShow: 1,
     slidesToScroll: 1,
     autoplay: true,
     autoplaySpeed: 5000,
-    fade: false,
-    cssEase: 'linear',
     nextArrow: <NextArrow />,
     prevArrow: <PrevArrow />
   };
@@ -263,15 +262,8 @@ export function Home() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* SEO Meta Tags */}
-      <SEOHead
-        title={homePageSettings?.seo?.title || 'Skyway Suites - Premium Property Rentals in Kenya'}
-        description={homePageSettings?.seo?.description || 'Discover luxury property rentals in Kenya with Skyway Suites. Browse verified properties in Nairobi and beyond. Book your perfect stay today.'}
-        keywords={homePageSettings?.seo?.keywords || 'property rentals kenya, luxury apartments nairobi, vacation rentals kenya, skyway suites'}
-        ogImage={homePageSettings?.seo?.ogImage || (homePageSettings?.slides?.[0]?.image || '')}
-        ogType="website"
-        canonicalUrl={window.location.origin}
-      />
+      {/* Connection Status Banner */}
+      <ConnectionStatusBanner />
       
       {/* Header */}
       <Header />
@@ -289,13 +281,16 @@ export function Home() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/30 flex items-center">
                   <div className="container mx-auto px-4">
-                    <div className="max-w-2xl mt-16">
-                      <h2 className="text-2xl md:text-4xl font-bold text-white mb-3">
+                    <div className="max-w-2xl">
+                      <h2 className="text-3xl md:text-5xl font-bold text-white mb-3">
                         {slide.title}
                       </h2>
-                      <p className="text-base md:text-lg text-gray-200">
+                      <p className="text-lg md:text-xl text-gray-200 mb-6">
                         {slide.subtitle}
                       </p>
+                      <Button size="lg" className="bg-[#6B7F39] hover:bg-[#5a6930] text-lg">
+                        Explore Properties
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -696,53 +691,52 @@ export function Home() {
       {/* Footer */}
       <footer className="bg-[#36454F] text-white py-12">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
+          <div className="grid md:grid-cols-3 gap-8 mb-8">
             {/* Company Info */}
             <div>
-              <h3 className="text-2xl font-bold mb-4">Skyway Suites</h3>
+              {generalSettings?.companyLogo && (
+                <img 
+                  src={generalSettings.companyLogo} 
+                  alt="Company Logo" 
+                  className="h-12 mb-3"
+                />
+              )}
+              <h3 className="text-2xl font-bold mb-4">
+                {generalSettings?.companyName || 'Skyway Suites'}
+              </h3>
               <p className="text-gray-300 text-sm mb-4">
-                Kenya's premier property listing and management platform. 
-                Find your dream home with ease and confidence.
+                We provide premium accommodation solutions for professionals, families, and travelers seeking the perfect blend of modern amenities and warm hospitality.
               </p>
-            </div>
-
-            {/* Quick Links */}
-            <div>
-              <h4 className="font-semibold text-lg mb-4">Quick Links</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="text-gray-300 hover:text-[#6B7F39] transition">Browse Properties</a></li>
-                <li><a href="#" className="text-gray-300 hover:text-[#6B7F39] transition">About Us</a></li>
-                <li><a href="#" className="text-gray-300 hover:text-[#6B7F39] transition">How It Works</a></li>
-                <li><a href="#" className="text-gray-300 hover:text-[#6B7F39] transition">Contact Us</a></li>
-              </ul>
             </div>
 
             {/* Property Types */}
             <div>
               <h4 className="font-semibold text-lg mb-4">Property Types</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="text-gray-300 hover:text-[#6B7F39] transition">Apartments</a></li>
-                <li><a href="#" className="text-gray-300 hover:text-[#6B7F39] transition">Houses</a></li>
-                <li><a href="#" className="text-gray-300 hover:text-[#6B7F39] transition">Villas</a></li>
-                <li><a href="#" className="text-gray-300 hover:text-[#6B7F39] transition">Commercial</a></li>
+                <li className="text-gray-300">Studio/ Bedsitter</li>
+                <li className="text-gray-300">1 Bedroom</li>
+                <li className="text-gray-300">2 Bedroom</li>
+                <li className="text-gray-300">3 Bedroom</li>
               </ul>
             </div>
 
-            {/* Newsletter */}
+            {/* Talk to us */}
             <div>
-              <h4 className="font-semibold text-lg mb-4">Stay Updated</h4>
-              <p className="text-gray-300 text-sm mb-4">
-                Subscribe to get the latest property listings
-              </p>
-              <div className="flex gap-2">
-                <Input 
-                  placeholder="Your email" 
-                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                />
-                <Button className="bg-[#6B7F39] hover:bg-[#5a6930]">
-                  Subscribe
-                </Button>
-              </div>
+              <h4 className="font-semibold text-lg mb-4">Talk to us</h4>
+              <ul className="space-y-3 text-sm">
+                <li className="flex items-center gap-3">
+                  <Phone className="w-4 h-4 text-white" />
+                  <div className="text-gray-300">{generalSettings?.companyPhone || '+254 700 123 456'}</div>
+                </li>
+                <li className="flex items-center gap-3">
+                  <Mail className="w-4 h-4 text-white" />
+                  <div className="text-gray-300">{generalSettings?.companyEmail || 'info@skywaysuites.co.ke'}</div>
+                </li>
+                <li className="flex items-center gap-3">
+                  <Globe className="w-4 h-4 text-white" />
+                  <div className="text-gray-300">{generalSettings?.companyWebsite || 'www.skywaysuites.co.ke'}</div>
+                </li>
+              </ul>
             </div>
           </div>
 

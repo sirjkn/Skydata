@@ -1,7 +1,7 @@
 /**
  * Settings Helper Functions for Skyway Suites
  * Provides easy-to-use functions for managing settings in Supabase
- * Version 2.0 - Cloud Integration with Caching
+ * Version 1.0 - Cloud Integration
  */
 
 import {
@@ -9,7 +9,7 @@ import {
   upsertSetting,
   fetchSettingsByCategory,
   deleteSetting
-} from '../../lib/cachedSupabaseData';
+} from '../../lib/supabaseData';
 
 // ============================================================================
 // GENERAL SETTINGS HELPERS
@@ -99,12 +99,6 @@ export async function getHomePageSettings() {
         linkedin: ''
       },
       copyrightText: '© 2026 Skyway Suites. All rights reserved.'
-    },
-    seo: {
-      title: 'Skyway Suites - Premium Property Rentals in Kenya',
-      description: 'Discover luxury property rentals in Kenya with Skyway Suites. Browse verified properties in Nairobi and beyond. Book your perfect stay today.',
-      keywords: 'property rentals kenya, luxury apartments nairobi, vacation rentals kenya, skyway suites, nairobi accommodation',
-      ogImage: ''
     }
   };
 }
