@@ -1,10 +1,9 @@
+import { Menu, X, Building2, ExternalLink, Home, LogOut } from 'lucide-react';
+import { Link, useNavigate } from 'react-router';
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import { Building2, LogOut, Menu, X, ExternalLink, Home } from 'lucide-react';
 import { Button } from './ui/button';
 import { getCurrentUser, logout, isAdmin } from '../lib/auth';
-import { fetchMenuPages } from '../../lib/supabaseData';
-import { ConnectionStatusIndicator } from './connection-status';
+import { fetchMenuPages } from '../../lib/cachedSupabaseData';
 
 export function Header() {
   const navigate = useNavigate();
@@ -115,11 +114,6 @@ export function Header() {
           </nav>
           
           <div className="flex items-center gap-4">
-            {/* Connection Status */}
-            <div className="hidden md:block">
-              <ConnectionStatusIndicator />
-            </div>
-            
             {/* Mobile menu toggle */}
             {menuItems.length > 0 && (
               <button

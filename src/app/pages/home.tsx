@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { fetchProperties, fetchBookings, fetchCategories } from '../../lib/cachedSupabaseData';
 import { getHomePageSettings, getGeneralSettings } from '../lib/settingsHelpers';
-import { ConnectionStatusBanner } from '../components/connection-status';
+import { SEOHead } from '../components/seo-head';
 import Slider from 'react-slick';
 import { 
   Shield, 
@@ -261,8 +261,15 @@ export function Home() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Connection Status Banner */}
-      <ConnectionStatusBanner />
+      {/* SEO Meta Tags */}
+      <SEOHead
+        title={homePageSettings?.seo?.title || 'Skyway Suites - Premium Property Rentals in Kenya'}
+        description={homePageSettings?.seo?.description || 'Discover luxury property rentals in Kenya with Skyway Suites. Browse verified properties in Nairobi and beyond. Book your perfect stay today.'}
+        keywords={homePageSettings?.seo?.keywords || 'property rentals kenya, luxury apartments nairobi, vacation rentals kenya, skyway suites'}
+        ogImage={homePageSettings?.seo?.ogImage || (homePageSettings?.slides?.[0]?.image || '')}
+        ogType="website"
+        canonicalUrl={window.location.origin}
+      />
       
       {/* Header */}
       <Header />
@@ -280,16 +287,13 @@ export function Home() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/30 flex items-center">
                   <div className="container mx-auto px-4">
-                    <div className="max-w-2xl">
-                      <h2 className="text-3xl md:text-5xl font-bold text-white mb-3">
+                    <div className="max-w-2xl mt-16">
+                      <h2 className="text-2xl md:text-4xl font-bold text-white mb-3">
                         {slide.title}
                       </h2>
-                      <p className="text-lg md:text-xl text-gray-200 mb-6">
+                      <p className="text-base md:text-lg text-gray-200">
                         {slide.subtitle}
                       </p>
-                      <Button size="lg" className="bg-[#6B7F39] hover:bg-[#5a6930] text-lg">
-                        Explore Properties
-                      </Button>
                     </div>
                   </div>
                 </div>

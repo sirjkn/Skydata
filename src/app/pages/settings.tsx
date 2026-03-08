@@ -31,7 +31,6 @@ import {
   Grid3x3,
   Type,
   List,
-  Activity,
   Globe,
   AlertCircle,
   Info,
@@ -47,7 +46,8 @@ import {
   Heart,
   Check,
   Headset,
-  X
+  X,
+  Search
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -58,20 +58,20 @@ import { Header } from '../components/header';
 import { getCurrentUser } from '../lib/auth';
 import { DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from '/src/lib/supabase';
 import { checkConnection } from '../../lib/connectionStatus';
-import { ConnectionStatusBanner } from '../components/connection-status';
+// Direct Supabase operations (writes, deletes, etc.)
 import {
   fetchCustomers,
-  fetchActivityLogs,
-  deleteActivityLogs,
-  createActivityLog,
   clearAllProperties,
   clearAllCustomers,
   clearAllBookings,
   clearAllPayments,
-  fetchProperties,
   fetchBookings,
   fetchPayments
 } from '../../lib/supabaseData';
+// Use cached data fetching for better performance
+import {
+  fetchProperties
+} from '../../lib/cachedSupabaseData';
 import * as settingsHelpers from '../lib/settingsHelpers';
 
 type SettingsTab = 'general' | 'homepage' | 'users' | 'database' | 'sms';
@@ -88,10 +88,6 @@ export function Settings() {
   
   const [activeTab, setActiveTab] = useState<SettingsTab>(tabFromUrl || 'general');
   
-  // Activity Log State
-  const [showActivityLog, setShowActivityLog] = useState(false);
-  const [activityLogs, setActivityLogs] = useState<any[]>([]);
-
   // Modal States
   const [modalState, setModalState] = useState<{
     show: boolean;
@@ -200,6 +196,13 @@ export function Settings() {
         linkedin: ''
       },
       copyrightText: '© 2026 Skyway Suites. All rights reserved.'
+    },
+    // SEO Settings
+    seo: {
+      title: 'Skyway Suites - Premium Property Rentals in Kenya',
+      description: 'Discover luxury property rentals in Kenya with Skyway Suites. Browse verified properties in Nairobi and beyond. Book your perfect stay today.',
+      keywords: 'property rentals kenya, luxury apartments nairobi, vacation rentals kenya, skyway suites, nairobi accommodation',
+      ogImage: ''
     }
   });
 
@@ -300,17 +303,6 @@ export function Settings() {
         setAfricastalkingSettings(smsSettingsData.africastalking || africastalkingSettings);
         setTwilioSettings(smsSettingsData.twilio || twilioSettings);
         setDefaultMessages(smsSettingsData.defaultMessages || defaultMessages);
-
-        // Load activity logs
-        const logsData = await fetchActivityLogs(100);
-        const formattedLogs = logsData.map((log: any) => ({
-          id: log.activity_id,
-          timestamp: log.created_at,
-          user: log.user_name || 'System',
-          action: log.activity,
-          details: log.activity_type
-        }));
-        setActivityLogs(formattedLogs);
       } catch (error) {
         console.error('Error loading settings from Supabase:', error);
       }
@@ -326,24 +318,6 @@ export function Settings() {
     return () => clearInterval(intervalId);
   }, []);
 
-  // Log Activity
-  const logActivity = async (action: string, details: string) => {
-    if (!checkConnection()) {
-      console.warn('Cannot log activity - no internet connection');
-      return;
-    }
-
-    try {
-      await createActivityLog({
-        activity: action,
-        activity_type: details,
-        user_name: currentUser?.name || 'System'
-      });
-    } catch (error) {
-      console.error('Error logging activity:', error);
-    }
-  };
-
   // Save General Settings
   const handleSaveGeneralSettings = async () => {
     if (!checkConnection()) {
@@ -353,7 +327,6 @@ export function Settings() {
 
     try {
       await settingsHelpers.saveGeneralSettings(generalSettings);
-      await logActivity('Settings Updated', 'General settings saved to cloud');
       showModal('success', 'Settings Saved', 'General settings saved successfully to the cloud!');
     } catch (error) {
       console.error('Error saving general settings:', error);
@@ -387,7 +360,6 @@ export function Settings() {
 
     try {
       await settingsHelpers.saveHomePageSettings(homePageSettings);
-      await logActivity('Settings Updated', 'Home page settings saved');
       showModal('success', 'Settings Saved', 'Home page settings saved successfully!');
     } catch (error) {
       console.error('Error saving homepage settings:', error);
@@ -581,7 +553,6 @@ export function Settings() {
       setUsers([...users, newUserData]);
       setShowAddUserModal(false);
       setNewUser({ name: '', email: '', phone: '', password: '', role: 'Customer' });
-      await logActivity('User Added', `New user created: ${newUser.name}`);
       showModal('success', 'User Added', 'User created successfully!');
     } catch (error) {
       console.error('Error adding user:', error);
@@ -610,7 +581,6 @@ export function Settings() {
       setUsers(updatedUsers);
       setShowEditUserModal(false);
       setEditingUser(null);
-      await logActivity('User Updated', `User updated: ${editingUser.name}`);
       showModal('success', 'User Updated', 'User information updated successfully!');
     } catch (error) {
       console.error('Error updating user:', error);
@@ -626,7 +596,6 @@ export function Settings() {
       `Are you sure you want to delete ${user?.name}?`,
       async () => {
         setUsers(users.filter(u => u.id !== userId));
-        await logActivity('User Deleted', `User deleted: ${user?.name}`);
       },
       'Delete',
       'Cancel'
@@ -690,7 +659,6 @@ export function Settings() {
       URL.revokeObjectURL(url);
 
       closeModal();
-      await logActivity('Database Exported', 'Full database backup exported from cloud');
       showModal('success', 'Export Complete', 'Database exported successfully from cloud!');
     } catch (error) {
       console.error('Error exporting database from cloud:', error);
@@ -745,8 +713,6 @@ export function Settings() {
                 setTwilioSettings(data.settings.sms.twilio);
                 setDefaultMessages(data.settings.sms.defaultMessages);
               }
-
-              await logActivity('Database Restored', 'Full database restore from backup file to cloud');
               
               showModal('success', 'Restore Complete', 'Database restored successfully to cloud! The page will refresh.', () => {
                 window.location.reload();
@@ -814,7 +780,6 @@ export function Settings() {
       
       await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
       closeModal();
-      await logActivity('Database Query Copied', 'Cloud database data copied to clipboard');
       showModal('success', 'Copied', 'Cloud database query copied to clipboard!');
     } catch (error) {
       console.error('Error copying database query from cloud:', error);
@@ -836,7 +801,6 @@ export function Settings() {
       async () => {
         try {
           await clearAllProperties();
-          await logActivity('Data Cleared', 'All properties cleared from cloud database');
           showModal('success', 'Properties Cleared', 'All properties have been successfully deleted from the cloud database.');
         } catch (error) {
           console.error('Error clearing properties:', error);
@@ -861,7 +825,6 @@ export function Settings() {
       async () => {
         try {
           await clearAllCustomers();
-          await logActivity('Data Cleared', 'All customers cleared from cloud database');
           showModal('success', 'Customers Cleared', 'All customers have been successfully deleted from the cloud database.');
         } catch (error) {
           console.error('Error clearing customers:', error);
@@ -886,7 +849,6 @@ export function Settings() {
       async () => {
         try {
           await clearAllBookings();
-          await logActivity('Data Cleared', 'All bookings cleared from cloud database');
           showModal('success', 'Bookings Cleared', 'All bookings have been successfully deleted from the cloud database.');
         } catch (error) {
           console.error('Error clearing bookings:', error);
@@ -911,36 +873,10 @@ export function Settings() {
       async () => {
         try {
           await clearAllPayments();
-          await logActivity('Data Cleared', 'All payments cleared from cloud database');
           showModal('success', 'Payments Cleared', 'All payments have been successfully deleted from the cloud database.');
         } catch (error) {
           console.error('Error clearing payments:', error);
           showModal('error', 'Clear Failed', 'Failed to clear payments. Please try again.');
-        }
-      },
-      'Yes, Clear All',
-      'Cancel'
-    );
-  };
-
-  const handleClearActivityLogs = async () => {
-    if (!checkConnection()) {
-      showModal('error', 'No Connection', 'Cannot clear activity logs while offline. Please check your internet connection.');
-      return;
-    }
-
-    showModal(
-      'confirm',
-      'Clear All Activity Logs?',
-      'This will permanently delete ALL activity logs from the cloud database. This action cannot be undone. Are you sure you want to continue?',
-      async () => {
-        try {
-          await deleteActivityLogs();
-          await logActivity('Data Cleared', 'All activity logs cleared from cloud database');
-          showModal('success', 'Activity Logs Cleared', 'All activity logs have been successfully deleted from the cloud database.');
-        } catch (error) {
-          console.error('Error clearing activity logs:', error);
-          showModal('error', 'Clear Failed', 'Failed to clear activity logs. Please try again.');
         }
       },
       'Yes, Clear All',
@@ -967,11 +903,8 @@ export function Settings() {
             clearAllProperties(),
             clearAllCustomers(),
             clearAllBookings(),
-            clearAllPayments(),
-            deleteActivityLogs()
+            clearAllPayments()
           ]);
-
-          await logActivity('System Reset', 'Complete system reset - all data cleared from cloud database');
           
           showModal('success', 'System Reset Complete', 'All data has been cleared from the cloud database. The page will refresh.', () => {
             window.location.reload();
@@ -1002,7 +935,6 @@ export function Settings() {
       };
       
       await settingsHelpers.saveSmsSettings(smsSettings);
-      await logActivity('Settings Updated', 'SMS settings saved to cloud');
       showModal('success', 'Settings Saved', 'SMS settings saved successfully to the cloud!');
     } catch (error) {
       console.error('Error saving SMS settings:', error);
@@ -1172,9 +1104,6 @@ export function Settings() {
             </div>
           </div>
         </header>
-
-        {/* Connection Status Banner */}
-        {!isOnline && <ConnectionStatusBanner />}
 
         {/* Settings Content */}
         <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-[#FAF4EC] via-[#f5ede3] to-[#ebe2d5]">
@@ -1810,6 +1739,122 @@ export function Settings() {
                   </div>
                 </div>
 
+                {/* SEO Settings Section */}
+                <div className="bg-white rounded-2xl shadow-lg border border-[#36454F]/10 overflow-hidden">
+                  <div className="p-6 bg-[#FAF4EC] border-b border-[#36454F]/10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#6B7F39] flex items-center justify-center">
+                        <Search className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-[#36454F]">SEO Settings</h3>
+                        <p className="text-sm text-[#36454F]/70">Configure search engine optimization for home page</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-[#36454F]">Page Title <span className="text-xs text-gray-500">(50-60 characters recommended)</span></label>
+                      <Input
+                        value={homePageSettings.seo?.title || ''}
+                        onChange={(e) => setHomePageSettings({
+                          ...homePageSettings,
+                          seo: { ...homePageSettings.seo, title: e.target.value }
+                        })}
+                        placeholder="Enter page title for search engines"
+                        disabled={!isOnline}
+                        className="border-2 border-gray-300 focus:border-[#6B7F39] rounded-xl py-5"
+                        maxLength={70}
+                      />
+                      <p className="text-xs text-gray-500">{homePageSettings.seo?.title?.length || 0}/70 characters</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-[#36454F]">Meta Description <span className="text-xs text-gray-500">(150-160 characters recommended)</span></label>
+                      <Textarea
+                        value={homePageSettings.seo?.description || ''}
+                        onChange={(e) => setHomePageSettings({
+                          ...homePageSettings,
+                          seo: { ...homePageSettings.seo, description: e.target.value }
+                        })}
+                        placeholder="Enter a compelling description for search results"
+                        disabled={!isOnline}
+                        className="border-2 border-gray-300 focus:border-[#6B7F39] rounded-xl min-h-[100px] resize-y"
+                        maxLength={200}
+                        rows={3}
+                      />
+                      <p className="text-xs text-gray-500">{homePageSettings.seo?.description?.length || 0}/200 characters</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-[#36454F]">Keywords <span className="text-xs text-gray-500">(comma-separated)</span></label>
+                      <Input
+                        value={homePageSettings.seo?.keywords || ''}
+                        onChange={(e) => setHomePageSettings({
+                          ...homePageSettings,
+                          seo: { ...homePageSettings.seo, keywords: e.target.value }
+                        })}
+                        placeholder="property rentals, luxury apartments, nairobi accommodation"
+                        disabled={!isOnline}
+                        className="border-2 border-gray-300 focus:border-[#6B7F39] rounded-xl py-5"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-[#36454F]">Social Media Image (Open Graph) <span className="text-xs text-gray-500">(1200x630px recommended)</span></label>
+                      <div className="flex gap-3">
+                        {homePageSettings.seo?.ogImage && (
+                          <div className="w-32 h-20 rounded-lg overflow-hidden border-2 border-[#6B7F39] flex-shrink-0">
+                            <img 
+                              src={homePageSettings.seo.ogImage} 
+                              alt="OG Image"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                try {
+                                  const compressedImage = await compressImage(file, 100);
+                                  setHomePageSettings({
+                                    ...homePageSettings,
+                                    seo: { ...homePageSettings.seo, ogImage: compressedImage }
+                                  });
+                                } catch (error) {
+                                  console.error('Error compressing image:', error);
+                                }
+                              }
+                            }}
+                            disabled={!isOnline}
+                            className="border-2 border-gray-300 focus:border-[#6B7F39] rounded-xl"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Used when sharing your site on social media</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-4">
+                      <div className="flex gap-3">
+                        <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-blue-900">
+                          <p className="font-semibold mb-1">SEO Best Practices:</p>
+                          <ul className="list-disc list-inside space-y-1 text-xs">
+                            <li>Keep titles under 60 characters to avoid truncation in search results</li>
+                            <li>Write compelling descriptions between 150-160 characters</li>
+                            <li>Use relevant keywords naturally in your content</li>
+                            <li>Social media images should be 1200x630px for best display</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Save Button */}
                 <div className="flex justify-end">
                   <Button 
@@ -2025,16 +2070,6 @@ export function Settings() {
                       >
                         <CreditCard className="w-4 h-4" />
                         <span className="text-sm font-semibold">Clear Payments</span>
-                      </Button>
-
-                      <Button
-                        onClick={handleClearActivityLogs}
-                        variant="outline"
-                        className="border-2 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300 hover:text-black h-auto py-3 flex flex-col items-center gap-1.5"
-                        disabled={!isOnline}
-                      >
-                        <Activity className="w-4 h-4" />
-                        <span className="text-sm font-semibold">Clear Activity Logs</span>
                       </Button>
 
                       <Button

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { fetchProperties, fetchBookings } from '../../lib/supabaseData';
-import { ConnectionStatusBanner } from '../components/connection-status';
+import { fetchProperties, fetchBookings } from '../../lib/cachedSupabaseData';
 import { 
   MapPin,
   Bed,
@@ -72,9 +71,6 @@ export function AllProperties() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Connection Status Banner */}
-      <ConnectionStatusBanner />
-      
       {/* Header */}
       <Header />
 

@@ -99,6 +99,12 @@ export async function getHomePageSettings() {
         linkedin: ''
       },
       copyrightText: '© 2026 Skyway Suites. All rights reserved.'
+    },
+    seo: {
+      title: 'Skyway Suites - Premium Property Rentals in Kenya',
+      description: 'Discover luxury property rentals in Kenya with Skyway Suites. Browse verified properties in Nairobi and beyond. Book your perfect stay today.',
+      keywords: 'property rentals kenya, luxury apartments nairobi, vacation rentals kenya, skyway suites, nairobi accommodation',
+      ogImage: ''
     }
   };
 }

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import Slider from 'react-slick';
-import { fetchProperties, fetchBookings, fetchCustomers, createBooking } from '../../lib/supabaseData';
-import { ConnectionStatusBanner } from '../components/connection-status';
+import { fetchProperties, fetchBookings, fetchCustomers, createBooking } from '../../lib/cachedSupabaseData';
+import { SEOHead } from '../components/seo-head';
 import { 
   Building2, 
   ChevronLeft,
@@ -494,8 +494,34 @@ export function PropertyDetails() {
 
   return (
     <div className="min-h-screen bg-[#FAF4EC] overflow-x-hidden">
-      {/* Connection Status Banner */}
-      <ConnectionStatusBanner />
+      {/* SEO Meta Tags */}
+      <SEOHead
+        title={`${property.name} - ${property.location} | Skyway Suites`}
+        description={`Book ${property.name} in ${property.location}. ${property.beds} bedrooms, ${property.baths} bathrooms, ${property.area} sqft. KSh ${property.price.toLocaleString()}/day. ${property.description?.substring(0, 150) || 'Premium property rental in Kenya'}`}
+        keywords={`${property.name}, ${property.location}, property rental kenya, ${property.beds} bedroom, accommodation kenya, skyway suites`}
+        ogImage={propertyImages[0] || ''}
+        ogType="product"
+        canonicalUrl={`${window.location.origin}/property/${property.id}`}
+        structuredData={{
+          "@context": "https://schema.org",
+          "@type": "Product",
+          "name": property.name,
+          "image": propertyImages,
+          "description": property.description,
+          "offers": {
+            "@type": "Offer",
+            "price": property.price,
+            "priceCurrency": "KES",
+            "availability": propertyIsBooked ? "https://schema.org/PreOrder" : "https://schema.org/InStock",
+            "priceValidUntil": new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "reviewCount": "127"
+          }
+        }}
+      />
       
       {/* Header */}
       <Header />

@@ -12,9 +12,10 @@ interface CacheItem {
 
 // Cache TTL configurations (in milliseconds)
 const CACHE_TTL = {
-  CATEGORIES: 30 * 60 * 1000, // 30 minutes (categories don't change often)
-  SETTINGS: 15 * 60 * 1000, // 15 minutes (settings might change occasionally)
-  PROPERTIES: 5 * 60 * 1000, // 5 minutes (properties update more frequently)
+  CATEGORIES: 60 * 60 * 1000, // 60 minutes (categories rarely change)
+  SETTINGS: 30 * 60 * 1000, // 30 minutes (settings might change occasionally)
+  PROPERTIES: 30 * 60 * 1000, // 30 minutes - EXTENDED for faster loading ⚡
+  FEATURES: 60 * 60 * 1000, // 60 minutes (features rarely change)
   IMAGES: 60 * 60 * 1000, // 60 minutes (images rarely change)
 };
 
@@ -131,11 +132,64 @@ class CacheManager {
       console.warn('Cache invalidate pattern failed:', error);
     }
   }
+
+  /**
+   * Invalidate specific cache key (alias for delete)
+   */
+  invalidate(key: string): void {
+    this.delete(key);
+  }
+
+  /**
+   * Get cache timestamp for a specific key
+   */
+  getCacheTimestamp(key: string): number | null {
+    try {
+      const item = localStorage.getItem(this.prefix + key);
+      if (!item) return null;
+
+      const cacheItem: CacheItem = JSON.parse(item);
+      return cacheItem.timestamp;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Check if cache exists and is valid
+   */
+  isValid(key: string): boolean {
+    try {
+      const item = localStorage.getItem(this.prefix + key);
+      if (!item) return false;
+
+      const cacheItem: CacheItem = JSON.parse(item);
+      const now = Date.now();
+
+      return now - cacheItem.timestamp <= cacheItem.ttl;
+    } catch (error) {
+      return false;
+    }
+  }
 }
 
 // Singleton instance
 export const cacheManager = new CacheManager();
 export { CACHE_TTL };
+
+/**
+ * Get cache statistics
+ */
+export function getCacheStats() {
+  return cacheManager.getStats();
+}
+
+/**
+ * Clear all cache
+ */
+export function clearAllCache(): void {
+  cacheManager.clearAll();
+}
 
 // Image cache helper using browser's Cache API
 export const imageCache = {

@@ -9,10 +9,6 @@ import { Signup } from "./pages/signup";
 import { Setup } from "./pages/setup";
 import { AdminDashboard } from "./pages/admin-dashboard";
 import { Settings } from "./pages/settings";
-import { CustomPage } from "./pages/custom-page";
-import { MenuPagesManager } from "./pages/menu-pages-manager";
-import { ActivityLog } from "./pages/activity-log";
-import ResetPassword from "./pages/ResetPassword";
 import { NotFound } from "./pages/not-found";
 
 export const router = createBrowserRouter([
@@ -45,10 +41,6 @@ export const router = createBrowserRouter([
         Component: Setup,
       },
       {
-        path: "reset-password",
-        Component: ResetPassword,
-      },
-      {
         path: "admin/dashboard",
         Component: AdminDashboard,
       },
@@ -59,18 +51,6 @@ export const router = createBrowserRouter([
       {
         path: "settings",
         Component: Settings,
-      },
-      {
-        path: "admin/menu-pages",
-        Component: MenuPagesManager,
-      },
-      {
-        path: "admin/activity-log",
-        Component: ActivityLog,
-      },
-      {
-        path: "page/:slug",
-        Component: CustomPage,
       },
       {
         path: "*",

@@ -19,37 +19,38 @@
 import * as supabaseData from './supabaseData';
 import { cacheManager, CACHE_TTL, imageCache } from './cacheManager';
 
+// Export cache manager for external use
+export { cacheManager } from './cacheManager';
+
 // ============================================================================
-// CACHED READ OPERATIONS
+// CACHED READ OPERATIONS WITH BACKGROUND SYNC
 // ============================================================================
 
 /**
- * Fetch categories with caching
+ * Fetch properties with instant cache load + background refresh
  */
-export async function fetchCategories(): Promise<supabaseData.Category[]> {
-  const cacheKey = 'categories';
-  const cached = cacheManager.get(cacheKey);
-
-  if (cached) {
-    console.log('📦 Categories loaded from cache');
-    return cached;
-  }
-
-  console.log('🌐 Fetching categories from database');
-  const data = await supabaseData.fetchCategories();
-  cacheManager.set(cacheKey, data, CACHE_TTL.CATEGORIES);
-  return data;
-}
-
-/**
- * Fetch properties with caching
- */
-export async function fetchProperties(): Promise<supabaseData.Property[]> {
+export async function fetchProperties(forceRefresh = false): Promise<supabaseData.Property[]> {
   const cacheKey = 'properties';
   const cached = cacheManager.get(cacheKey);
 
-  if (cached) {
-    console.log('📦 Properties loaded from cache');
+  // Return cached data immediately if available and not forcing refresh
+  if (cached && !forceRefresh) {
+    console.log('📦 Properties loaded from cache (instant)');
+    
+    // Background refresh if cache is older than 10 minutes
+    const cacheTimestamp = cacheManager.getCacheTimestamp(cacheKey);
+    const ageInMinutes = cacheTimestamp ? (Date.now() - cacheTimestamp) / (1000 * 60) : 999;
+    
+    if (ageInMinutes > 10) {
+      console.log('🔄 Background refresh triggered (cache > 10 min)');
+      // Non-blocking background refresh
+      supabaseData.fetchProperties()
+        .then(freshData => {
+          cacheManager.set(cacheKey, freshData, CACHE_TTL.PROPERTIES);
+          console.log('✅ Properties refreshed in background');
+        })
+        .catch(err => console.warn('Background refresh failed:', err));
+    }
     
     // Preload images in background
     const imageUrls: string[] = [];
@@ -123,6 +124,24 @@ export async function fetchPropertyById(propertyId: number): Promise<supabaseDat
       imageCache.preloadImages(imageUrls);
     }
   }
+  return data;
+}
+
+/**
+ * Fetch categories with caching
+ */
+export async function fetchCategories(): Promise<supabaseData.Category[]> {
+  const cacheKey = 'categories';
+  const cached = cacheManager.get(cacheKey);
+
+  if (cached) {
+    console.log('📦 Categories loaded from cache');
+    return cached;
+  }
+
+  console.log('🌐 Fetching categories from database');
+  const data = await supabaseData.fetchCategories();
+  cacheManager.set(cacheKey, data, CACHE_TTL.CATEGORIES);
   return data;
 }
 

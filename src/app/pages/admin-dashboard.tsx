@@ -22,7 +22,6 @@ import {
   Tag,
   Star,
   Search,
-  Activity,
   Info,
   Clock,
   CheckCircle2,
@@ -42,15 +41,17 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 // Connection monitoring
 import { checkConnection } from '../../lib/connectionStatus';
-import { ConnectionStatusBanner } from '../components/connection-status';
+// Use cached data fetching for better performance
 import {
   fetchProperties,
   fetchCustomers,
-  fetchBookings,
   fetchCategories,
-  fetchFeatures,
+  fetchFeatures
+} from '../../lib/cachedSupabaseData';
+// Direct Supabase operations (writes, deletes, etc.)
+import {
+  fetchBookings,
   fetchPayments,
-  fetchActivityLogs,
   createProperty,
   updateProperty,
   deleteProperty,
@@ -67,12 +68,10 @@ import {
   createPayment,
   deletePayment,
   fetchPaymentsByBooking,
-  createActivityLog,
   clearAllProperties,
   clearAllCustomers,
   clearAllBookings,
-  clearAllPayments,
-  deleteActivityLogs
+  clearAllPayments
 } from '../../lib/supabaseData';
 import * as adminHelpers from '../lib/adminHelpers';
 
@@ -144,8 +143,6 @@ export function AdminDashboard() {
   const [showPropertyModal, setShowPropertyModal] = useState(false);
   const [showViewPropertyModal, setShowViewPropertyModal] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
-  const [showActivityLog, setShowActivityLog] = useState(false);
-  const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [showBookPropertyDropdown, setShowBookPropertyDropdown] = useState(false);
   const [bookPropertySearchTerm, setBookPropertySearchTerm] = useState('');
   const bookPropertyDropdownRef = useRef<HTMLDivElement>(null);
@@ -212,6 +209,10 @@ export function AdminDashboard() {
   const [receiptData, setReceiptData] = useState<any>(null);
   const [receiptType, setReceiptType] = useState<'booking' | 'payment'>('booking'); // Track receipt type
   const receiptRef = useRef<HTMLDivElement>(null);
+  
+  // Cache management states
+  const [lastDataUpdate, setLastDataUpdate] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Payment form
   const [paymentForm, setPaymentForm] = useState({
@@ -473,6 +474,126 @@ export function AdminDashboard() {
     navigate('/');
   };
 
+  // Manual refresh function
+  const handleManualRefresh = async () => {
+    if (!isOnline || isRefreshing) return;
+    
+    setIsRefreshing(true);
+    try {
+      console.log('🔄 Manual refresh triggered...');
+      
+      // Force refresh by clearing cache and reloading
+      const categoriesData = await fetchCategories();
+      const categoryNames = categoriesData.map(c => c.category_name);
+      setCategories(categoryNames);
+      
+      const featuresData = await fetchFeatures();
+      const featureNames = featuresData.map(f => f.feature_name);
+      setFeatures(featureNames);
+      
+      const propertiesData = await fetchProperties(true); // Force refresh
+      const mappedProperties = propertiesData.map(p => {
+        const categoryObj = categoriesData.find((c: any) => c.category_id === p.category_id);
+        const categoryName = categoryObj ? categoryObj.category_name : '';
+        
+        return {
+          id: p.property_id,
+          name: p.property_name,
+          category: categoryName,
+          location: p.location,
+          beds: p.no_of_beds,
+          baths: p.bathrooms,
+          area: p.area_sqft,
+          price: p.price_per_month,
+          photos: p.photos ? JSON.parse(p.photos) : {},
+          features: p.features ? JSON.parse(p.features) : [],
+          description: p.description || '',
+          viewCount: p.view_count,
+          isFeatured: p.is_featured,
+          isAvailable: p.is_available
+        };
+      });
+      setProperties(mappedProperties);
+      
+      // Reload bookings and payments (always real-time anyway)
+      const bookingsData = await fetchBookings();
+      const customersData = await fetchCustomers();
+      const mappedCustomers = customersData.map(c => ({
+        id: c.customer_id,
+        name: c.customer_name,
+        phone: c.phone,
+        email: c.email,
+        address: c.address || '',
+        idNumber: c.id_number || '',
+        profilePhoto: c.profile_photo || '',
+        notes: c.notes || '',
+        isActive: c.is_active,
+        createdAt: c.created_at
+      }));
+      setCustomers(mappedCustomers);
+      
+      const mappedBookings = bookingsData.map(b => ({
+        id: b.booking_id,
+        propertyId: b.property_id,
+        customerId: b.customer_id,
+        checkIn: b.check_in_date,
+        checkOut: b.check_out_date,
+        totalAmount: b.total_amount,
+        amountPaid: b.amount_paid,
+        paymentStatus: b.payment_status,
+        bookingStatus: b.booking_status,
+        paymentMode: b.payment_method || 'N/A',
+        transactionId: b.payment_reference || 'N/A',
+        notes: b.notes || ''
+      }));
+      
+      const enrichedBookings = mappedBookings.map(booking => {
+        const property = mappedProperties.find(p => p.id === booking.propertyId);
+        const customer = mappedCustomers.find(c => c.id === booking.customerId);
+        return {
+          ...booking,
+          propertyName: property?.name || 'Unknown Property',
+          customerName: customer?.name || 'Unknown Customer',
+          customerEmail: customer?.email || '',
+          customerPhone: customer?.phone || ''
+        };
+      });
+      setBookings(enrichedBookings);
+      
+      const paymentsData = await fetchPayments();
+      const enrichedPayments = paymentsData.map(p => {
+        const relatedBooking = enrichedBookings.find(b => b.id === p.booking_id);
+        const bookingPayments = paymentsData.filter(pay => pay.booking_id === p.booking_id);
+        const totalPaid = bookingPayments.reduce((sum, pay) => sum + (pay.amount || 0), 0);
+        const balance = relatedBooking ? Math.max(0, (relatedBooking.totalAmount || 0) - totalPaid) : 0;
+        
+        return {
+          id: p.payment_id,
+          bookingId: p.booking_id,
+          paidAmount: p.amount,
+          paymentMode: p.payment_method,
+          transactionId: p.payment_reference,
+          date: p.payment_date,
+          customerName: relatedBooking?.customerName || 'Unknown Customer',
+          customerEmail: relatedBooking?.customerEmail || '',
+          customerPhone: relatedBooking?.customerPhone || '',
+          propertyName: relatedBooking?.propertyName || 'Unknown Property',
+          balance: balance
+        };
+      });
+      setPayments(enrichedPayments);
+      
+      setLastDataUpdate(new Date());
+      showModal('success', 'Data Refreshed', 'Dashboard data has been updated successfully!');
+      console.log('✅ Manual refresh completed');
+    } catch (error) {
+      console.error('❌ Manual refresh failed:', error);
+      showModal('error', 'Refresh Failed', 'Failed to refresh data. Please try again.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   // Menu items
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: TrendingUp, active: true },
@@ -480,8 +601,6 @@ export function AdminDashboard() {
     { id: 'bookings', label: 'Bookings', icon: Calendar, active: true },
     { id: 'customers', label: 'Customers', icon: Users, active: true },
     { id: 'payments', label: 'Payments', icon: CreditCard, active: true },
-    { id: 'menu-pages', label: 'Menu Pages', icon: FileText, active: true },
-    { id: 'activity-log', label: 'Activity Log', icon: Activity, active: true },
     { id: 'settings', label: 'Settings', icon: Settings, active: true }
   ];
 
@@ -627,19 +746,10 @@ export function AdminDashboard() {
         console.log('✅ Payments loaded and enriched:', enrichedPayments.length);
         
         // Load activity logs
-        const logsData = await fetchActivityLogs(100);
-        const mappedLogs = logsData.map(l => ({
-          id: l.activity_id,
-          userId: l.user_id,
-          userName: l.user_name,
-          userRole: l.user_role,
-          activity: l.activity,
-          timestamp: l.created_at
-        }));
-        setActivityLogs(mappedLogs);
-        console.log('✅ Activity logs loaded:', mappedLogs.length);
-        
         console.log('✅ All Admin Dashboard data loaded successfully!');
+        
+        // Set last update timestamp
+        setLastDataUpdate(new Date());
       } catch (error: any) {
         if (error.message === 'NO_CONNECTION') {
           console.error('⚠️ No connection - data loading aborted');
@@ -1318,24 +1428,6 @@ export function AdminDashboard() {
       
       // Update state to show new property immediately
       setProperties([...properties, newProperty]);
-      
-      // Log activity
-      const currentUser = getCurrentUser();
-      if (currentUser && parseInt(currentUser.id)) {
-        try {
-          await adminHelpers.logActivity(
-            parseInt(currentUser.id),
-            currentUser.name,
-            currentUser.role,
-            `Created property: ${propertyForm.name}`,
-            'create',
-            'property',
-            newProperty.id
-          );
-        } catch (logError) {
-          console.error('Failed to log activity:', logError);
-        }
-      }
 
       // Reset form
       setPropertyForm({
@@ -1673,7 +1765,6 @@ export function AdminDashboard() {
 
   return (
     <>
-      <ConnectionStatusBanner />
       <div className="min-h-screen bg-[#f0f0f0] flex">
         {/* Sidebar */}
         <aside className={`bg-[#36454F] border-r border-gray-200 transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'}`}>
@@ -1709,8 +1800,6 @@ export function AdminDashboard() {
                     if (isClickable) {
                       if (item.id === 'settings') {
                         navigate('/admin/settings');
-                      } else if (item.id === 'activity-log') {
-                        navigate('/admin/activity-log');
                       } else {
                         setActiveMenu(item.id);
                       }
@@ -1828,6 +1917,28 @@ export function AdminDashboard() {
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto">
           <div className="px-3 md:px-6 py-4 md:py-8">
+            {/* Cache Status Bar */}
+            {lastDataUpdate && (
+              <div className="mb-4 flex items-center justify-between bg-[#FAF4EC] border border-[#6B7F39]/20 rounded-lg px-4 py-3">
+                <div className="flex items-center gap-2 text-sm text-[#36454F]">
+                  <Clock className="w-4 h-4 text-[#6B7F39]" />
+                  <span>
+                    Last updated: {lastDataUpdate.toLocaleTimeString()} 
+                    <span className="hidden md:inline"> on {lastDataUpdate.toLocaleDateString()}</span>
+                  </span>
+                </div>
+                <button
+                  onClick={handleManualRefresh}
+                  disabled={!isOnline || isRefreshing}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-[#6B7F39] text-white rounded-md hover:bg-[#5a6930] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  title="Refresh dashboard data"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span className="hidden md:inline">Refresh</span>
+                </button>
+              </div>
+            )}
+            
             {/* Welcome Section */}
             <div className="mb-6 md:mb-8">
               <h2 className="text-xl md:text-3xl font-bold text-[#36454F] mb-2">
@@ -2924,41 +3035,6 @@ export function AdminDashboard() {
               </>
             )}
 
-            {/* Menu Pages Content */}
-            {activeMenu === 'menu-pages' && (
-              <Card>
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="text-lg md:text-xl font-bold text-[#36454F]">Menu Pages</CardTitle>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => navigate('/admin/menu-pages')}
-                        className="bg-[#6B7F39] hover:bg-[#5a6930]"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Manage Menu
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-12">
-                    <FileText className="w-16 h-16 mx-auto mb-4 text-[#6B7F39]" />
-                    <p className="text-lg font-semibold text-[#36454F] mb-2">Menu Pages Management</p>
-                    <p className="text-sm text-gray-600 mb-6">
-                      Create custom pages, link internal pages, or add external URLs to your site navigation
-                    </p>
-                    <Button
-                      onClick={() => navigate('/admin/menu-pages')}
-                      className="bg-[#6B7F39] hover:bg-[#5a6930]"
-                    >
-                      Get Started
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Settings Content */}
             {activeMenu === 'settings' && (
               <>
@@ -3245,42 +3321,6 @@ export function AdminDashboard() {
                             </Button>
                           </div>
 
-                          {/* Clear Activity Logs */}
-                          <div className="border border-gray-200 rounded-lg p-4">
-                            <div className="flex items-center gap-3 mb-3">
-                              <Activity className="w-5 h-5 text-[#36454F]" />
-                              <div>
-                                <h4 className="font-semibold text-[#36454F]">Clear Activity Logs</h4>
-                                <p className="text-xs text-gray-600">Remove all activity log entries</p>
-                              </div>
-                            </div>
-                            <Button
-                              onClick={() => {
-                                showModal('confirm', 'Clear Activity Logs?', 
-                                  `This will permanently delete all ${activityLogs.length} activity log entries from the database. This action cannot be undone.`,
-                                  async () => {
-                                    try {
-                                      await deleteActivityLogs();
-                                      setActivityLogs([]);
-                                      showModal('success', 'Success', 'All activity logs have been cleared.');
-                                    } catch (error) {
-                                      console.error('Error clearing activity logs:', error);
-                                      showModal('error', 'Error', 'Failed to clear activity logs. Please try again.');
-                                    }
-                                  },
-                                  'Clear All',
-                                  'Cancel'
-                                );
-                              }}
-                              disabled={!isOnline || activityLogs.length === 0}
-                              variant="outline"
-                              className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Clear Activity Logs ({activityLogs.length})
-                            </Button>
-                          </div>
-
                           {/* Reset System */}
                           <div className="border border-gray-200 rounded-lg p-4 md:col-span-2">
                             <div className="flex items-center gap-3 mb-3">
@@ -3300,14 +3340,12 @@ export function AdminDashboard() {
                                         clearAllProperties(),
                                         clearAllCustomers(),
                                         clearAllBookings(),
-                                        clearAllPayments(),
-                                        deleteActivityLogs()
+                                        clearAllPayments()
                                       ]);
                                       setProperties([]);
                                       setCustomers([]);
                                       setBookings([]);
                                       setPayments([]);
-                                      setActivityLogs([]);
                                       showModal('success', 'System Reset Complete', 'All data has been cleared. The system has been reset to default settings.');
                                     } catch (error) {
                                       console.error('Error resetting system:', error);
@@ -4760,23 +4798,6 @@ export function AdminDashboard() {
                     const updatedProperties = properties.filter(p => p.id !== selectedProperty.id);
                     setProperties(updatedProperties);
                     
-                    // Log activity
-                    try {
-                      await createActivityLog({
-                        user_id: user?.id || null,
-                        user_name: user?.name || 'Unknown',
-                        user_role: user?.role || 'Unknown',
-                        activity: `Deleted property: ${selectedProperty.name}`,
-                        activity_type: 'delete',
-                        entity_type: 'property',
-                        entity_id: selectedProperty.id,
-                        ip_address: null,
-                        user_agent: navigator.userAgent
-                      });
-                    } catch (logError) {
-                      console.error('Failed to log activity:', logError);
-                    }
-                    
                     setShowDeleteConfirm(false);
                     setSelectedProperty(null);
                     
@@ -6087,74 +6108,6 @@ export function AdminDashboard() {
                 className="flex-1"
               >
                 Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Activity Log Modal */}
-      {showActivityLog && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border-2 border-gray-200 animate-in zoom-in-95 duration-300">
-            <div className="p-6 bg-gradient-to-r from-[#6B7F39] to-[#36454F] rounded-t-3xl">
-              <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-bold text-white flex items-center gap-3">
-                  <Activity className="w-7 h-7" />
-                  Activity Log
-                </h3>
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowActivityLog(false)}
-                  className="text-white hover:bg-white/20 rounded-xl"
-                >
-                  <X className="w-5 h-5" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="overflow-y-auto max-h-[calc(90vh-200px)] p-6">
-              {activityLogs.length > 0 ? (
-                <div className="space-y-3">
-                  {activityLogs.slice().reverse().map((log, index) => (
-                    <div
-                      key={index}
-                      className="p-4 bg-gradient-to-r from-[#FAF4EC] to-white rounded-xl border-2 border-gray-200 hover:border-[#6B7F39] transition-all duration-200 hover:shadow-md"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="px-3 py-1 bg-[#6B7F39] text-white text-xs font-bold rounded-full">
-                              {log.action}
-                            </span>
-                            <span className="text-xs text-gray-500 flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {new Date(log.timestamp).toLocaleString()}
-                            </span>
-                          </div>
-                          <p className="text-gray-700 font-medium">{log.details}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-16">
-                  <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                    <Activity className="w-10 h-10 text-gray-400" />
-                  </div>
-                  <p className="text-gray-500 text-lg font-medium">No activity logs yet</p>
-                  <p className="text-gray-400 text-sm mt-2">Actions performed will appear here</p>
-                </div>
-              )}
-            </div>
-
-            <div className="p-6 border-t-2 border-gray-100 bg-gray-50">
-              <Button
-                onClick={() => setShowActivityLog(false)}
-                className="w-full bg-gradient-to-r from-[#36454F] to-[#6B7F39] hover:from-[#2a3640] hover:to-[#5a6930] text-white font-semibold py-6 rounded-xl shadow-lg"
-              >
-                Close
               </Button>
             </div>
           </div>
