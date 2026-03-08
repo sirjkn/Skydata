@@ -1,14 +1,12 @@
-import { Menu, X, Building2, ExternalLink, Home, LogOut } from 'lucide-react';
+import { Menu, X, Building2, Home, LogOut } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { getCurrentUser, logout, isAdmin } from '../lib/auth';
-import { fetchMenuPages } from '../../lib/cachedSupabaseData';
 
 export function Header() {
   const navigate = useNavigate();
   const [user, setUser] = useState(getCurrentUser());
-  const [menuItems, setMenuItems] = useState<any[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -28,58 +26,10 @@ export function Header() {
     };
   }, []);
 
-  // Load menu items from Supabase
-  useEffect(() => {
-    const loadMenuItems = async () => {
-      try {
-        const pages = await fetchMenuPages();
-        // Convert Supabase menu pages to menu items format
-        const items = pages.map(page => {
-          // Check if this is an internal link or custom page
-          const isInternalLink = page.page_slug.startsWith('/');
-          
-          return {
-            id: page.page_id,
-            title: page.page_name,
-            slug: page.page_slug,
-            type: isInternalLink ? 'internal' : 'custom',
-            url: isInternalLink ? page.page_slug : undefined,
-            showInMenu: true
-          };
-        });
-        setMenuItems(items);
-      } catch (error) {
-        console.error('Failed to load menu items:', error);
-        setMenuItems([]);
-      }
-    };
-
-    loadMenuItems();
-
-    // Listen for menu updates
-    window.addEventListener('menuItemsUpdated', loadMenuItems);
-
-    return () => {
-      window.removeEventListener('menuItemsUpdated', loadMenuItems);
-    };
-  }, []);
-
   const handleLogout = () => {
     logout();
     setUser(null);
     navigate('/');
-  };
-
-  const handleMenuItemClick = (item: any) => {
-    setMobileMenuOpen(false);
-    
-    if (item.type === 'custom') {
-      navigate(`/page/${item.slug}`);
-    } else if (item.type === 'internal') {
-      navigate(item.url);
-    } else if (item.type === 'external') {
-      window.open(item.url, '_blank', 'noopener,noreferrer');
-    }
   };
 
   return (
@@ -101,28 +51,28 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-6">
-            {menuItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => handleMenuItemClick(item)}
-                className="text-white hover:text-[#FAF4EC] transition-colors font-medium flex items-center gap-1"
-              >
-                {item.title}
-                {item.type === 'external' && <ExternalLink className="w-3 h-3" />}
-              </button>
-            ))}
+            <button
+              onClick={() => navigate('/')}
+              className="text-white hover:text-[#FAF4EC] transition-colors font-medium flex items-center gap-1"
+            >
+              Home
+            </button>
+            <button
+              onClick={() => navigate('/all-properties')}
+              className="text-white hover:text-[#FAF4EC] transition-colors font-medium flex items-center gap-1"
+            >
+              Properties
+            </button>
           </nav>
           
           <div className="flex items-center gap-4">
             {/* Mobile menu toggle */}
-            {menuItems.length > 0 && (
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden text-white hover:text-[#6B7F39]"
-              >
-                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </button>
-            )}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden text-white hover:text-[#6B7F39]"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
 
             {user ? (
               <>
@@ -143,37 +93,29 @@ export function Header() {
                   <p className="text-xs text-gray-300">{user.email}</p>
                 </div>
                 
-                {/* Mobile: Back Home Button */}
-                <Button
-                  onClick={() => navigate('/')}
-                  variant="outline"
-                  className="md:hidden border-white text-black bg-white hover:bg-gray-100"
-                >
-                  <Home className="w-4 h-4 mr-2" />
-                  <span>Home</span>
-                </Button>
-                
+                {/* Desktop: Logout Button */}
                 <Button
                   onClick={handleLogout}
                   variant="outline"
-                  className="border-white text-black bg-white hover:bg-gray-100"
+                  className="hidden lg:flex border-white text-black bg-white hover:bg-gray-100"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
-                  <span className="hidden sm:inline">Logout</span>
+                  <span>Logout</span>
                 </Button>
               </>
             ) : (
               <>
+                {/* Desktop: Login and Create Account Buttons */}
                 <Button
                   onClick={() => navigate('/login')}
                   variant="outline"
-                  className="border-white text-black bg-white hover:bg-gray-100"
+                  className="hidden lg:flex border-white text-black bg-white hover:bg-gray-100"
                 >
                   Login
                 </Button>
                 <Button
                   onClick={() => navigate('/signup')}
-                  className="bg-[#6B7F39] hover:bg-[#5a6930]"
+                  className="hidden lg:flex bg-[#6B7F39] hover:bg-[#5a6930]"
                 >
                   Create Account
                 </Button>
@@ -183,19 +125,73 @@ export function Header() {
         </div>
 
         {/* Mobile Navigation Menu */}
-        {mobileMenuOpen && menuItems.length > 0 && (
+        {mobileMenuOpen && (
           <nav className="lg:hidden mt-4 pt-4 border-t border-gray-600">
             <div className="flex flex-col gap-3">
-              {menuItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => handleMenuItemClick(item)}
-                  className="text-white hover:text-[#FAF4EC] transition-colors font-medium text-left flex items-center gap-2 py-2"
-                >
-                  {item.title}
-                  {item.type === 'external' && <ExternalLink className="w-3 h-3" />}
-                </button>
-              ))}
+              <button
+                onClick={() => { navigate('/'); setMobileMenuOpen(false); }}
+                className="text-white hover:text-[#FAF4EC] transition-colors font-medium text-left flex items-center gap-2 py-2"
+              >
+                Home
+              </button>
+              <button
+                onClick={() => { navigate('/all-properties'); setMobileMenuOpen(false); }}
+                className="text-white hover:text-[#FAF4EC] transition-colors font-medium text-left flex items-center gap-2 py-2"
+              >
+                Properties
+              </button>
+              
+              {/* Divider */}
+              <div className="border-t border-gray-600 my-2"></div>
+              
+              {user ? (
+                <>
+                  {/* Show Admin Dashboard for admins */}
+                  {isAdmin(user) && (
+                    <button
+                      onClick={() => { navigate('/admin/dashboard'); setMobileMenuOpen(false); }}
+                      className="text-white hover:text-[#FAF4EC] transition-colors font-medium text-left flex items-center gap-2 py-2"
+                    >
+                      Admin Dashboard
+                    </button>
+                  )}
+                  
+                  {/* User Info */}
+                  <div className="px-2 py-3 bg-white/10 rounded-lg">
+                    <p className="text-sm font-medium text-white">{user.name}</p>
+                    <p className="text-xs text-gray-300">{user.email}</p>
+                  </div>
+                  
+                  {/* Logout Button */}
+                  <Button
+                    onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                    variant="outline"
+                    className="w-full border-white text-black bg-white hover:bg-gray-100 mt-2"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    <span>Logout</span>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {/* Login Button */}
+                  <Button
+                    onClick={() => { navigate('/login'); setMobileMenuOpen(false); }}
+                    variant="outline"
+                    className="w-full border-white text-black bg-white hover:bg-gray-100"
+                  >
+                    Login
+                  </Button>
+                  
+                  {/* Create Account Button */}
+                  <Button
+                    onClick={() => { navigate('/signup'); setMobileMenuOpen(false); }}
+                    className="w-full bg-[#6B7F39] hover:bg-[#5a6930] text-white"
+                  >
+                    Create Account
+                  </Button>
+                </>
+              )}
             </div>
           </nav>
         )}

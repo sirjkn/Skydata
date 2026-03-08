@@ -70,6 +70,19 @@
   height: 100%;
 }
 
+/* Remove any blur or opacity effects */
+.slick-slide img {
+  filter: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* Ensure active slide is crisp and clear */
+.slick-slide.slick-active img {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
 /* Focus states */
 .slick-slide:focus {
   outline: none;

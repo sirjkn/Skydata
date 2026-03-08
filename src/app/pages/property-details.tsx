@@ -278,7 +278,7 @@ export function PropertyDetails() {
   const propertyImageSettings = {
     dots: true,
     infinite: propertyImages.length > 1,
-    speed: 500,
+    speed: 300,
     slidesToShow: 1,
     slidesToScroll: 1,
     arrows: propertyImages.length > 1,
@@ -291,7 +291,8 @@ export function PropertyDetails() {
     autoplay: true,
     autoplaySpeed: 4000,
     pauseOnHover: true,
-    cssEase: 'ease-in-out'
+    fade: false,
+    cssEase: 'linear'
   };
 
   const getAmenityIcon = (amenity: string) => {

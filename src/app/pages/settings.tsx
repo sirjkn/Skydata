@@ -1042,13 +1042,6 @@ export function Settings() {
               <span className="font-medium">Payments</span>
             </button>
             <button
-              onClick={() => navigate('/admin/dashboard')}
-              className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-[#2a3440] transition"
-            >
-              <FileText className="w-5 h-5" />
-              <span className="font-medium">Menu Pages</span>
-            </button>
-            <button
               onClick={() => navigate('/admin/activity-log')}
               className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-[#2a3440] transition"
             >

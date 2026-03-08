@@ -236,11 +236,13 @@ export function Home() {
   const heroSettings = {
     dots: true,
     infinite: true,
-    speed: 800,
+    speed: 300,
     slidesToShow: 1,
     slidesToScroll: 1,
     autoplay: true,
     autoplaySpeed: 5000,
+    fade: false,
+    cssEase: 'linear',
     nextArrow: <NextArrow />,
     prevArrow: <PrevArrow />
   };
