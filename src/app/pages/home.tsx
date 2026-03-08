@@ -279,18 +279,15 @@ export function Home() {
                   alt={slide.title}
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/30 flex items-center">
+                <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/30 flex items-end pb-8">
                   <div className="container mx-auto px-4">
                     <div className="max-w-2xl">
-                      <h2 className="text-3xl md:text-5xl font-bold text-white mb-3">
+                      <h2 className="text-base md:text-lg font-bold text-white mb-3">
                         {slide.title}
                       </h2>
-                      <p className="text-lg md:text-xl text-gray-200 mb-6">
+                      <p className="text-xs md:text-sm text-gray-200 mb-6">
                         {slide.subtitle}
                       </p>
-                      <Button size="lg" className="bg-[#6B7F39] hover:bg-[#5a6930] text-lg">
-                        Explore Properties
-                      </Button>
                     </div>
                   </div>
                 </div>
