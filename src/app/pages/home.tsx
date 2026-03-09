@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { fetchProperties, fetchBookings, fetchCategories } from '../../lib/supabaseData';
+import { fetchProperties, fetchBookings, fetchCategories } from '../../lib/api';
 import { getHomePageSettings, getGeneralSettings } from '../lib/settingsHelpers';
 import { ConnectionStatusBanner } from '../components/connection-status';
 import Slider from 'react-slick';
@@ -186,14 +186,19 @@ export function Home() {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const [loadedProperties, loadedBookings, loadedCategories] = await Promise.all([
+        // Only fetch properties and categories (public data)
+        // Bookings require auth, so we'll fetch them separately if user is logged in
+        const [propertiesResult, categoriesResult] = await Promise.all([
           fetchProperties(),
-          fetchBookings(),
           fetchCategories()
         ]);
         
-        // Convert Supabase format to app format
-        const formattedProperties = loadedProperties.map(p => ({
+        // Handle API response format
+        const loadedProperties = propertiesResult.data || [];
+        const loadedCategories = categoriesResult.data || [];
+        
+        // Convert API format to app format
+        const formattedProperties = loadedProperties.map((p: any) => ({
           id: p.property_id,
           name: p.property_name,
           category: p.category_id,
@@ -207,21 +212,30 @@ export function Home() {
           features: typeof p.features === 'string' ? JSON.parse(p.features) : p.features,
           createdAt: p.created_at
         }));
-
-        const formattedBookings = loadedBookings.map(b => ({
-          id: b.booking_id,
-          propertyId: b.property_id,
-          customerId: b.customer_id,
-          checkIn: b.check_in_date,
-          checkOut: b.check_out_date,
-          status: b.booking_status,
-          totalAmount: b.total_amount
-        }));
         
         setProperties(formattedProperties);
-        setBookings(formattedBookings);
         setCategories(loadedCategories);
-      } catch (error) {
+        
+        // Try to fetch bookings if user is logged in
+        try {
+          const bookingsResult = await fetchBookings();
+          const loadedBookings = bookingsResult.data || [];
+          const formattedBookings = loadedBookings.map((b: any) => ({
+            id: b.booking_id,
+            propertyId: b.property_id,
+            customerId: b.customer_id,
+            checkIn: b.check_in_date,
+            checkOut: b.check_out_date,
+            status: b.booking_status,
+            totalAmount: b.total_amount
+          }));
+          setBookings(formattedBookings);
+        } catch (bookingError) {
+          // User not logged in, skip bookings (not critical for home page)
+          console.log('Bookings not loaded (user not authenticated)');
+          setBookings([]);
+        }
+      } catch (error: any) {
         console.error('Failed to load data:', error);
         setProperties([]);
         setBookings([]);

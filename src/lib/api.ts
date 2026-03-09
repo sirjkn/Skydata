@@ -1,23 +1,25 @@
 /**
- * API Client for Skyway Suites
- * Handles all HTTP requests to the Vercel backend
+ * API Client for Neon Database via Vercel Serverless Functions
+ * Replaces Supabase client
  */
 
-// API Base URL - Update this after deploying to Vercel
-const API_BASE_URL = process.env.VERCEL_URL 
-  ? `https://${process.env.VERCEL_URL}/api`
-  : 'http://localhost:3000/api'; // For local development
+const API_BASE_URL = 'https://skydata.vercel.app/api';
 
-/**
- * Get auth token from localStorage
- */
+// Get auth token from localStorage
 function getAuthToken(): string | null {
-  return localStorage.getItem('authToken');
+  try {
+    const auth = localStorage.getItem('skyway_auth');
+    if (auth) {
+      const parsed = JSON.parse(auth);
+      return parsed.token;
+    }
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+  }
+  return null;
 }
 
-/**
- * Generic fetch wrapper with auth
- */
+// Generic fetch wrapper
 async function apiFetch<T = any>(
   endpoint: string,
   options: RequestInit = {}
@@ -29,7 +31,6 @@ async function apiFetch<T = any>(
     ...options.headers,
   };
   
-  // Add auth token if available
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -40,205 +41,246 @@ async function apiFetch<T = any>(
   });
   
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const error = await response.json().catch(() => ({ error: 'Request failed' }));
+    throw new Error(error.error || error.message || 'Request failed');
   }
   
   return response.json();
 }
 
 // =============================================
-// AUTH API
+// PROPERTIES
 // =============================================
 
-export interface SignUpData {
-  email: string;
-  password: string;
-  name: string;
-  role?: 'Customer' | 'Admin' | 'Manager';
+export async function fetchProperties() {
+  const data = await apiFetch<{ properties: any[] }>('/properties');
+  return { data: data.properties, error: null };
 }
 
-export interface SignInData {
-  email: string;
-  password: string;
+export async function fetchProperty(id: number) {
+  const data = await apiFetch<{ property: any }>(`/properties/${id}`);
+  return { data: data.property, error: null };
 }
 
-export interface AuthResponse {
-  user: {
-    user_id: number;
-    customer_name: string;
-    email: string;
-    role: string;
-  };
-  token: string;
+export async function createProperty(propertyData: any) {
+  const data = await apiFetch<{ property: any }>('/properties', {
+    method: 'POST',
+    body: JSON.stringify(propertyData),
+  });
+  return { data: data.property, error: null };
 }
 
-export const authAPI = {
-  signUp: (data: SignUpData) => 
-    apiFetch<AuthResponse>('/auth/signup', {
-      method: 'POST',
-      body: JSON.stringify(data),
+export async function updateProperty(id: number, propertyData: any) {
+  const data = await apiFetch<{ property: any }>(`/properties/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(propertyData),
+  });
+  return { data: data.property, error: null };
+}
+
+export async function deleteProperty(id: number) {
+  await apiFetch(`/properties/${id}`, { method: 'DELETE' });
+  return { data: null, error: null };
+}
+
+// =============================================
+// CATEGORIES
+// =============================================
+
+export async function fetchCategories() {
+  const data = await apiFetch<{ categories: any[] }>('/categories');
+  return { data: data.categories, error: null };
+}
+
+// =============================================
+// FEATURES
+// =============================================
+
+export async function fetchFeatures() {
+  const data = await apiFetch<{ features: any[] }>('/features');
+  return { data: data.features, error: null };
+}
+
+// =============================================
+// BOOKINGS
+// =============================================
+
+export async function fetchBookings() {
+  const data = await apiFetch<{ bookings: any[] }>('/bookings');
+  return { data: data.bookings, error: null };
+}
+
+export async function createBooking(bookingData: any) {
+  const data = await apiFetch<{ booking: any }>('/bookings', {
+    method: 'POST',
+    body: JSON.stringify(bookingData),
+  });
+  return { data: data.booking, error: null };
+}
+
+export async function updateBooking(id: number, bookingData: any) {
+  const data = await apiFetch<{ booking: any }>(`/bookings/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(bookingData),
+  });
+  return { data: data.booking, error: null };
+}
+
+// =============================================
+// CUSTOMERS
+// =============================================
+
+export async function fetchCustomers() {
+  const data = await apiFetch<{ customers: any[] }>('/customers');
+  return { data: data.customers, error: null };
+}
+
+export async function createCustomer(customerData: any) {
+  const data = await apiFetch<{ customer: any }>('/customers', {
+    method: 'POST',
+    body: JSON.stringify(customerData),
+  });
+  return { data: data.customer, error: null };
+}
+
+// =============================================
+// SETTINGS
+// =============================================
+
+export async function fetchSettings() {
+  const data = await apiFetch<{ settings: any[] }>('/settings');
+  return { data: data.settings, error: null };
+}
+
+export async function updateSetting(category: string, key: string, value: string) {
+  const data = await apiFetch<{ setting: any }>('/settings', {
+    method: 'PUT',
+    body: JSON.stringify({
+      setting_category: category,
+      setting_key: key,
+      setting_value: value,
     }),
+  });
+  return { data: data.setting, error: null };
+}
+
+// =============================================
+// ACTIVITY LOGS
+// =============================================
+
+export async function fetchActivityLogs() {
+  const data = await apiFetch<{ logs: any[] }>('/activity-logs');
+  return { data: data.logs, error: null };
+}
+
+export async function createActivityLog(logData: any) {
+  const data = await apiFetch<{ log: any }>('/activity-logs', {
+    method: 'POST',
+    body: JSON.stringify(logData),
+  });
+  return { data: data.log, error: null };
+}
+
+// =============================================
+// AUTH
+// =============================================
+
+export async function signUp(email: string, password: string, name: string, role: string = 'Customer') {
+  const data = await apiFetch<{ user: any; token: string }>('/auth/signup', {
+    method: 'POST',
+    body: JSON.stringify({ email, password, name, role }),
+  });
   
-  signIn: (data: SignInData) =>
-    apiFetch<AuthResponse>('/auth/signin', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+  // Store auth data
+  localStorage.setItem('skyway_auth', JSON.stringify({
+    user: data.user,
+    token: data.token,
+  }));
   
-  resetPassword: (email: string, newPassword: string) =>
-    apiFetch<{ success: boolean; message: string }>('/auth/reset-password', {
-      method: 'POST',
-      body: JSON.stringify({ email, newPassword }),
-    }),
+  return { data: data.user, error: null };
+}
+
+export async function signIn(email: string, password: string) {
+  const data = await apiFetch<{ user: any; token: string }>('/auth/signin', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
   
-  logout: () => {
-    localStorage.removeItem('authToken');
-  },
+  // Store auth data
+  localStorage.setItem('skyway_auth', JSON.stringify({
+    user: data.user,
+    token: data.token,
+  }));
+  
+  return { data: data.user, error: null };
+}
+
+export async function signOut() {
+  localStorage.removeItem('skyway_auth');
+  return { data: null, error: null };
+}
+
+export async function resetPassword(email: string, newPassword: string) {
+  await apiFetch('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ email, newPassword }),
+  });
+  return { data: null, error: null };
+}
+
+export function getCurrentUser() {
+  try {
+    const auth = localStorage.getItem('skyway_auth');
+    if (auth) {
+      const parsed = JSON.parse(auth);
+      return parsed.user;
+    }
+  } catch (error) {
+    console.error('Error getting current user:', error);
+  }
+  return null;
+}
+
+// =============================================
+// CLOUDINARY
+// =============================================
+
+export async function getCloudinarySignature() {
+  const data = await apiFetch<{
+    signature: string;
+    timestamp: number;
+    cloudName: string;
+    apiKey: string;
+  }>('/cloudinary/signature', {
+    method: 'POST',
+  });
+  return data;
+}
+
+// Export default object for backward compatibility
+const api = {
+  fetchProperties,
+  fetchProperty,
+  createProperty,
+  updateProperty,
+  deleteProperty,
+  fetchCategories,
+  fetchFeatures,
+  fetchBookings,
+  createBooking,
+  updateBooking,
+  fetchCustomers,
+  createCustomer,
+  fetchSettings,
+  updateSetting,
+  fetchActivityLogs,
+  createActivityLog,
+  signUp,
+  signIn,
+  signOut,
+  resetPassword,
+  getCurrentUser,
+  getCloudinarySignature,
 };
 
-// =============================================
-// PROPERTIES API
-// =============================================
-
-export const propertiesAPI = {
-  getAll: () => 
-    apiFetch<{ properties: any[] }>('/properties'),
-  
-  getById: (id: number) =>
-    apiFetch<{ property: any }>(`/properties/${id}`),
-  
-  create: (data: any) =>
-    apiFetch<{ property: any }>('/properties', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  
-  update: (id: number, data: any) =>
-    apiFetch<{ property: any }>(`/properties/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  
-  delete: (id: number) =>
-    apiFetch<{ success: boolean }>(`/properties/${id}`, {
-      method: 'DELETE',
-    }),
-};
-
-// =============================================
-// BOOKINGS API
-// =============================================
-
-export const bookingsAPI = {
-  getAll: () =>
-    apiFetch<{ bookings: any[] }>('/bookings'),
-  
-  create: (data: any) =>
-    apiFetch<{ booking: any }>('/bookings', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  
-  update: (id: number, data: any) =>
-    apiFetch<{ booking: any }>(`/bookings/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-};
-
-// =============================================
-// CUSTOMERS API
-// =============================================
-
-export const customersAPI = {
-  getAll: () =>
-    apiFetch<{ customers: any[] }>('/customers'),
-  
-  create: (data: any) =>
-    apiFetch<{ customer: any }>('/customers', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-};
-
-// =============================================
-// CATEGORIES & FEATURES API
-// =============================================
-
-export const categoriesAPI = {
-  getAll: () =>
-    apiFetch<{ categories: any[] }>('/categories'),
-};
-
-export const featuresAPI = {
-  getAll: () =>
-    apiFetch<{ features: any[] }>('/features'),
-};
-
-// =============================================
-// SETTINGS API
-// =============================================
-
-export const settingsAPI = {
-  getAll: () =>
-    apiFetch<{ settings: any[] }>('/settings'),
-  
-  update: (category: string, key: string, value: string) =>
-    apiFetch<{ setting: any }>('/settings', {
-      method: 'PUT',
-      body: JSON.stringify({ setting_category: category, setting_key: key, setting_value: value }),
-    }),
-};
-
-// =============================================
-// ACTIVITY LOGS API
-// =============================================
-
-export const activityLogsAPI = {
-  getAll: () =>
-    apiFetch<{ logs: any[] }>('/activity-logs'),
-  
-  create: (data: any) =>
-    apiFetch<{ log: any }>('/activity-logs', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-};
-
-// =============================================
-// CLOUDINARY API
-// =============================================
-
-export const cloudinaryAPI = {
-  getSignature: () =>
-    apiFetch<{ signature: string; timestamp: number; cloudName: string; apiKey: string }>('/cloudinary/signature', {
-      method: 'POST',
-    }),
-};
-
-// =============================================
-// HEALTH CHECK
-// =============================================
-
-export const healthAPI = {
-  check: () =>
-    apiFetch<{ status: string; database: string; storage: string }>('/health'),
-};
-
-// =============================================
-// EXPORT ALL
-// =============================================
-
-export default {
-  auth: authAPI,
-  properties: propertiesAPI,
-  bookings: bookingsAPI,
-  customers: customersAPI,
-  categories: categoriesAPI,
-  features: featuresAPI,
-  settings: settingsAPI,
-  activityLogs: activityLogsAPI,
-  cloudinary: cloudinaryAPI,
-  health: healthAPI,
-};
+export default api;
