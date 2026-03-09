@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { fetchProperties, fetchBookings } from '../../lib/supabaseData';
-import { ConnectionStatusBanner } from '../components/connection-status';
 import { 
   MapPin,
   Bed,
   Bath,
   Maximize,
   Home as HomeIcon,
-  ArrowLeft
+  Search,
+  Filter,
+  X
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
+import { Input } from '../components/ui/input';
 import { Header } from '../components/header';
 
 export function AllProperties() {
@@ -19,6 +21,8 @@ export function AllProperties() {
   const [properties, setProperties] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
 
   // Load properties and bookings from Supabase
   useEffect(() => {
@@ -70,11 +74,16 @@ export function AllProperties() {
     loadData();
   }, []);
 
+  // Filter properties based on search term and category
+  const filteredProperties = properties
+    .filter(property => 
+      property.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      (filterCategory === '' || property.category === filterCategory)
+    )
+    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Connection Status Banner */}
-      <ConnectionStatusBanner />
-      
       {/* Header */}
       <Header />
 
@@ -99,6 +108,32 @@ export function AllProperties() {
       {/* Properties Grid */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+            <div className="flex items-center">
+              <Search className="w-5 h-5 mr-2 text-gray-500" />
+              <Input
+                type="text"
+                placeholder="Search properties..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full md:w-64"
+              />
+            </div>
+            <div className="flex items-center">
+              <Filter className="w-5 h-5 mr-2 text-gray-500" />
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="w-full md:w-64"
+              >
+                <option value="">All Categories</option>
+                <option value="1">Category 1</option>
+                <option value="2">Category 2</option>
+                <option value="3">Category 3</option>
+                {/* Add more categories as needed */}
+              </select>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {isLoading ? (
               <div className="col-span-full text-center py-16 relative">
@@ -109,9 +144,8 @@ export function AllProperties() {
                   <p className="text-gray-600">Please wait while we fetch available properties...</p>
                 </div>
               </div>
-            ) : properties.length > 0 ? (
-              properties
-                .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+            ) : filteredProperties.length > 0 ? (
+              filteredProperties
                 .map((property) => {
                   // Get the first available photo from any room category
                   const firstPhoto = property.photos && Object.values(property.photos).flat().find((p: any) => p);

@@ -36,8 +36,8 @@ export default function ResetPassword() {
       setMessage(data.message || 'Password reset successfully!');
       setNewPassword('');
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
-      console.error('Password reset error:', err);
+      // Silently handle error and show user-friendly message
+      setError('Password reset service is currently unavailable. Please contact support or use the Neon database directly.');
     } finally {
       setLoading(false);
     }

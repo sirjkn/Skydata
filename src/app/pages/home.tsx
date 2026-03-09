@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { fetchProperties, fetchBookings, fetchCategories } from '../../lib/api';
 import { getHomePageSettings, getGeneralSettings } from '../lib/settingsHelpers';
-import { ConnectionStatusBanner } from '../components/connection-status';
 import Slider from 'react-slick';
 import { 
   Shield, 
@@ -181,10 +180,11 @@ export function Home() {
     loadSettings();
   }, []);
 
-  // Load properties and bookings from Supabase
+  // Load properties and bookings from database
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
+      console.log('🔍 VERIFICATION: Using Neon API at https://skydata.vercel.app/api');
       try {
         // Only fetch properties and categories (public data)
         // Bookings require auth, so we'll fetch them separately if user is logged in
@@ -192,6 +192,11 @@ export function Home() {
           fetchProperties(),
           fetchCategories()
         ]);
+        
+        console.log('✅ Successfully fetched from Neon:', {
+          properties: propertiesResult.data?.length || 0,
+          categories: categoriesResult.data?.length || 0
+        });
         
         // Handle API response format
         const loadedProperties = propertiesResult.data || [];
@@ -276,9 +281,6 @@ export function Home() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Connection Status Banner */}
-      <ConnectionStatusBanner />
-      
       {/* Header */}
       <Header />
 

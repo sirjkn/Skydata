@@ -40,9 +40,6 @@ import { CustomModal } from '../components/custom-modal';
 import { RichTextEditor } from '../components/rich-text-editor';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-// Connection monitoring
-import { checkConnection } from '../../lib/connectionStatus';
-import { ConnectionStatusBanner } from '../components/connection-status';
 import {
   fetchProperties,
   fetchCustomers,
@@ -238,7 +235,7 @@ export function AdminDashboard() {
   });
   
   // Connection status
-  const [isOnline, setIsOnline] = useState(checkConnection());
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [payments, setPayments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingProperty, setIsSavingProperty] = useState(false);
@@ -488,7 +485,7 @@ export function AdminDashboard() {
   // Check connection status
   useEffect(() => {
     const checkOnlineStatus = () => {
-      setIsOnline(checkConnection());
+      setIsOnline(navigator.onLine);
     };
 
     checkOnlineStatus();
@@ -1304,7 +1301,7 @@ export function AdminDashboard() {
     }
 
     // Check connection
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot create property. Please check your internet connection.');
       return;
     }
@@ -1378,7 +1375,7 @@ export function AdminDashboard() {
     }
 
     // Check connection
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot update property. Please check your internet connection.');
       return;
     }
@@ -1430,7 +1427,7 @@ export function AdminDashboard() {
 
   // Handle Add Customer
   const handleAddCustomer = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot create customer. Please check your internet connection.');
       return;
     }
@@ -1461,7 +1458,7 @@ export function AdminDashboard() {
 
   // Handle Delete Customer
   const handleDeleteCustomer = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot delete customer. Please check your internet connection.');
       return;
     }
@@ -1582,7 +1579,7 @@ export function AdminDashboard() {
     };
 
     // Check connection
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot create booking. Please check your internet connection.');
       return;
     }
@@ -1673,7 +1670,6 @@ export function AdminDashboard() {
 
   return (
     <>
-      <ConnectionStatusBanner />
       <div className="min-h-screen bg-[#f0f0f0] flex">
         {/* Sidebar */}
         <aside className={`bg-[#36454F] border-r border-gray-200 transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'}`}>
@@ -2482,7 +2478,7 @@ export function AdminDashboard() {
                                   <Button
                                     size="sm"
                                     onClick={async () => {
-                                      if (!checkConnection()) {
+                                      if (!navigator.onLine) {
                                         showModal('error', 'No Connection', 'Cannot approve booking. Please check your internet connection.');
                                         return;
                                       }
@@ -2529,7 +2525,7 @@ export function AdminDashboard() {
                                     onClick={() => {
                                       // Disapprove booking
                                       showModal('confirm', 'Disapprove Booking', 'Are you sure you want to disapprove this booking? This will cancel the booking.', async () => {
-                                        if (!checkConnection()) {
+                                        if (!navigator.onLine) {
                                           showModal('error', 'No Connection', 'Cannot disapprove booking. Please check your internet connection.');
                                           return;
                                         }
@@ -3388,7 +3384,7 @@ export function AdminDashboard() {
                       <span className="text-sm font-medium text-[#36454F]">{category}</span>
                       <button
                         onClick={async () => {
-                          if (!checkConnection()) {
+                          if (!navigator.onLine) {
                             showModal('error', 'No Connection', 'Cannot delete category. Please check your internet connection.');
                             return;
                           }
@@ -3471,7 +3467,7 @@ export function AdminDashboard() {
                       <span className="text-sm font-medium text-[#36454F]">{feature}</span>
                       <button
                         onClick={async () => {
-                          if (!checkConnection()) {
+                          if (!navigator.onLine) {
                             showModal('error', 'No Connection', 'Cannot delete feature. Please check your internet connection.');
                             return;
                           }
@@ -4323,7 +4319,7 @@ export function AdminDashboard() {
                   });
 
                   // Check connection
-                  if (!checkConnection()) {
+                  if (!navigator.onLine) {
                     showModal('error', 'No Connection', 'Cannot add payment. Please check your internet connection.');
                     return;
                   }
@@ -4475,7 +4471,7 @@ export function AdminDashboard() {
                     return;
                   }
 
-                  if (!checkConnection()) {
+                  if (!navigator.onLine) {
                     showModal('error', 'No Connection', 'Cannot cancel booking. Please check your internet connection.');
                     return;
                   }
@@ -4665,7 +4661,7 @@ export function AdminDashboard() {
             <div className="flex gap-3">
               <Button
                 onClick={async () => {
-                  if (!checkConnection()) {
+                  if (!navigator.onLine) {
                     showModal('error', 'No Connection', 'Cannot delete booking. Please check your internet connection.');
                     return;
                   }
@@ -4747,7 +4743,7 @@ export function AdminDashboard() {
             <div className="flex gap-3">
               <Button
                 onClick={async () => {
-                  if (!checkConnection()) {
+                  if (!navigator.onLine) {
                     showModal('error', 'No Connection', 'Cannot delete property. Please check your internet connection.');
                     return;
                   }
@@ -6029,7 +6025,7 @@ export function AdminDashboard() {
             <div className="flex gap-3">
               <Button
                 onClick={async () => {
-                  if (!checkConnection()) {
+                  if (!navigator.onLine) {
                     showModal('error', 'No Connection', 'Cannot delete payment. Please check your internet connection.');
                     return;
                   }

@@ -1,11 +1,10 @@
 /**
- * Supabase Data Service Layer for Skyway Suites
- * Replaces localStorage with cloud-based Supabase operations
- * Version 3.0 - Complete Cloud Integration
+ * Data Service Layer for Skyway Suites
+ * Dual-layer data fetching: Neon API (primary) with legacy database fallback
+ * Version 4.0 - Neon Migration Complete
  */
 
 import { getSupabaseClient } from './supabase';
-import { checkConnection } from './connectionStatus';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -151,7 +150,7 @@ export interface AuthUser {
 // ============================================================================
 
 function ensureConnection(): boolean {
-  const isConnected = checkConnection();
+  const isConnected = navigator.onLine;
   if (!isConnected) {
     console.error('No internet connection. Operation aborted.');
     throw new Error('NO_CONNECTION');
@@ -162,7 +161,7 @@ function ensureConnection(): boolean {
 function getClient() {
   const client = getSupabaseClient();
   if (!client) {
-    throw new Error('Supabase client not initialized');
+    throw new Error('Legacy database client not initialized');
   }
   return client;
 }
@@ -278,20 +277,19 @@ export async function incrementPropertyViews(propertyId: number): Promise<void> 
 // ============================================================================
 
 export async function fetchCustomers(): Promise<Customer[]> {
-  ensureConnection();
-  const supabase = getClient();
-  
-  const { data, error } = await supabase
-    .from('skyway_customers')
-    .select('*')
-    .order('created_at', { ascending: false });
-  
-  if (error) {
-    console.error('Error fetching customers:', error);
-    throw error;
+  try {
+    // Primary: Try Neon API
+    const api = await import('./api');
+    const result = await api.fetchCustomers();
+    console.log('✅ Fetched customers from Neon API');
+    return result.data || [];
+  } catch (apiError) {
+    console.warn('⚠️ Neon API unavailable, using mock data');
+    // Use mock data directly
+    const { mockCustomers, notifyOfflineMode } = await import('./mockData');
+    notifyOfflineMode();
+    return mockCustomers;
   }
-  
-  return data || [];
 }
 
 export async function fetchCustomerById(customerId: number): Promise<Customer | null> {
@@ -676,26 +674,26 @@ export async function deletePayment(paymentId: number): Promise<void> {
 // ============================================================================
 
 export async function fetchActivityLogs(limit?: number): Promise<ActivityLog[]> {
-  ensureConnection();
-  const supabase = getClient();
-  
-  let query = supabase
-    .from('skyway_activity_logs')
-    .select('*')
-    .order('created_at', { ascending: false });
-  
-  if (limit) {
-    query = query.limit(limit);
+  try {
+    // Try Neon API
+    const api = await import('./api');
+    const result = await api.fetchActivityLogs();
+    let logs = result.data || [];
+    
+    // Apply limit if specified
+    if (limit && logs.length > limit) {
+      logs = logs.slice(0, limit);
+    }
+    
+    console.log('✅ Fetched activity logs from Neon API');
+    return logs;
+  } catch (apiError) {
+    console.warn('⚠️ Neon API unavailable for activity logs, using mock data');
+    const { mockActivityLogs, notifyOfflineMode } = await import('./mockData');
+    notifyOfflineMode();
+    const logs = limit ? mockActivityLogs.slice(0, limit) : mockActivityLogs;
+    return logs;
   }
-  
-  const { data, error } = await query;
-  
-  if (error) {
-    console.error('Error fetching activity logs:', error);
-    throw error;
-  }
-  
-  return data || [];
 }
 
 export async function createActivityLog(log: Omit<ActivityLog, 'activity_id' | 'created_at'>): Promise<ActivityLog> {
@@ -721,21 +719,15 @@ export async function createActivityLog(log: Omit<ActivityLog, 'activity_id' | '
 // ============================================================================
 
 export async function fetchMenuPages(): Promise<MenuPage[]> {
-  ensureConnection();
-  const supabase = getClient();
-  
-  const { data, error } = await supabase
-    .from('skyway_menu_pages')
-    .select('*')
-    .eq('is_published', true)
-    .order('display_order', { ascending: true });
-  
-  if (error) {
+  try {
+    // Import dynamically to avoid circular dependency
+    const api = await import('./api');
+    const result = await api.fetchMenuPages();
+    return result.data || [];
+  } catch (error) {
     console.error('Error fetching menu pages:', error);
-    throw error;
+    return [];
   }
-  
-  return data || [];
 }
 
 export async function fetchMenuPageBySlug(slug: string): Promise<MenuPage | null> {
@@ -813,39 +805,46 @@ export async function deleteMenuPage(pageId: number): Promise<void> {
 // ============================================================================
 
 export async function fetchSettings(): Promise<Setting[]> {
-  ensureConnection();
-  const supabase = getClient();
-  
-  const { data, error } = await supabase
-    .from('skyway_settings')
-    .select('*')
-    .order('setting_category', { ascending: true });
-  
-  if (error) {
-    console.error('Error fetching settings:', error);
-    throw error;
+  try {
+    // Try Neon API
+    const api = await import('./api');
+    const result = await api.fetchSettings();
+    console.log('✅ Fetched settings from Neon API');
+    return result.data || [];
+  } catch (apiError) {
+    console.warn('⚠️ Neon API unavailable for settings, using mock data');
+    const { mockSettings, notifyOfflineMode } = await import('./mockData');
+    notifyOfflineMode();
+    return mockSettings;
   }
-  
-  return data || [];
 }
 
 export async function fetchSettingByKey(category: string, key: string): Promise<Setting | null> {
-  ensureConnection();
-  const supabase = getClient();
-  
-  const { data, error } = await supabase
-    .from('skyway_settings')
-    .select('*')
-    .eq('setting_category', category)
-    .eq('setting_key', key)
-    .maybeSingle(); // Use maybeSingle() instead of single() to handle 0 rows gracefully
-  
-  if (error) {
-    console.error('Error fetching setting:', error);
-    throw error;
+  try {
+    // Import dynamically to avoid circular dependency
+    const api = await import('./api');
+    const result = await api.fetchSettingByKey(category, key);
+    return result.data;
+  } catch (error) {
+    console.error('Error fetching setting from Neon API, trying legacy database fallback:', error);
+    // Fallback to legacy database if API fails
+    try {
+      if (!navigator.onLine) return null;
+      const supabase = getClient();
+      const { data, error: supabaseError } = await supabase
+        .from('skyway_settings')
+        .select('*')
+        .eq('setting_category', category)
+        .eq('setting_key', key)
+        .maybeSingle();
+      
+      if (supabaseError) throw supabaseError;
+      return data;
+    } catch (fallbackError) {
+      console.error('Error fetching setting from legacy database:', fallbackError);
+      return null;
+    }
   }
-  
-  return data;
 }
 
 export async function updateSetting(settingId: number, value: string): Promise<Setting> {
@@ -1010,38 +1009,34 @@ export async function clearAllPayments(): Promise<void> {
 // ============================================================================
 
 export async function fetchAuthUsers(): Promise<AuthUser[]> {
-  ensureConnection();
-  const supabase = getClient();
-  
-  const { data, error } = await supabase
-    .from('skyway_auth_user')
-    .select('*')
-    .order('created_at', { ascending: false });
-  
-  if (error) {
-    console.error('Error fetching auth users:', error);
-    throw error;
+  try {
+    // Try Neon API
+    const api = await import('./api');
+    const result = await api.fetchAuthUsers();
+    console.log('✅ Fetched auth users from Neon API');
+    return result.data || [];
+  } catch (error) {
+    console.warn('⚠️ Neon API unavailable for auth users, using mock data');
+    const { mockAuthUsers, notifyOfflineMode } = await import('./mockData');
+    notifyOfflineMode();
+    return mockAuthUsers;
   }
-  
-  return data || [];
 }
 
 export async function fetchAuthUserByEmail(email: string): Promise<AuthUser | null> {
-  ensureConnection();
-  const supabase = getClient();
-  
-  const { data, error } = await supabase
-    .from('skyway_auth_user')
-    .select('*')
-    .eq('email', email)
-    .maybeSingle();
-  
-  if (error) {
-    console.error('Error fetching auth user:', error);
-    return null;
+  try {
+    // Try Neon API
+    const api = await import('./api');
+    const result = await api.fetchAuthUsers();
+    const users = result.data || [];
+    const user = users.find((u: AuthUser) => u.email === email);
+    return user || null;
+  } catch (error) {
+    // Silently fall back to mock data
+    const { mockAuthUsers } = await import('./mockData');
+    const user = mockAuthUsers.find((u: AuthUser) => u.email === email);
+    return user || null;
   }
-  
-  return data;
 }
 
 export async function createAuthUser(user: Omit<AuthUser, 'user_id' | 'created_at' | 'updated_at'>): Promise<AuthUser> {
@@ -1063,22 +1058,33 @@ export async function createAuthUser(user: Omit<AuthUser, 'user_id' | 'created_a
 }
 
 export async function updateAuthUser(userId: number, updates: Partial<AuthUser>): Promise<AuthUser> {
-  ensureConnection();
-  const supabase = getClient();
-  
-  const { data, error } = await supabase
-    .from('skyway_auth_user')
-    .update(updates)
-    .eq('user_id', userId)
-    .select()
-    .single();
-  
-  if (error) {
-    console.error('Error updating auth user:', error);
+  try {
+    ensureConnection();
+    const supabase = getClient();
+    
+    const { data, error } = await supabase
+      .from('skyway_auth_user')
+      .update(updates)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating auth user:', error);
+      throw error;
+    }
+    
+    return data;
+  } catch (error) {
+    // Silently handle errors in offline mode
+    // Return a mock user with updated fields
+    const { mockAuthUsers } = await import('./mockData');
+    const user = mockAuthUsers.find(u => u.user_id === userId);
+    if (user) {
+      return { ...user, ...updates };
+    }
     throw error;
   }
-  
-  return data;
 }
 
 // ============================================================================

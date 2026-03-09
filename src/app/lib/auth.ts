@@ -4,7 +4,6 @@
  */
 
 import { fetchAuthUserByEmail, updateAuthUser } from '../../lib/supabaseData';
-import { checkConnection } from '../../lib/connectionStatus';
 
 export interface User {
   id: string;
@@ -20,7 +19,7 @@ const AUTH_STORAGE_KEY = 'skyway_auth_user';
  */
 export async function login(email: string, password: string): Promise<User | null> {
   // Check if connected for Supabase authentication
-  if (!checkConnection()) {
+  if (!navigator.onLine) {
     console.error('Cannot login: No internet connection - Skyway Suites requires internet connection');
     return null;
   }

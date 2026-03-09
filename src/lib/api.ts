@@ -5,6 +5,30 @@
 
 const API_BASE_URL = 'https://skydata.vercel.app/api';
 
+// Check if API is available (simple cache to avoid repeated checks)
+let apiAvailabilityCache: { available: boolean; lastCheck: number } | null = null;
+const API_CHECK_CACHE_DURATION = 30000; // 30 seconds
+
+async function isApiAvailable(): Promise<boolean> {
+  // Return cached result if recent
+  if (apiAvailabilityCache && Date.now() - apiAvailabilityCache.lastCheck < API_CHECK_CACHE_DURATION) {
+    return apiAvailabilityCache.available;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/health`, { 
+      method: 'GET',
+      signal: AbortSignal.timeout(3000) // 3 second timeout
+    });
+    const available = response.ok;
+    apiAvailabilityCache = { available, lastCheck: Date.now() };
+    return available;
+  } catch (error) {
+    apiAvailabilityCache = { available: false, lastCheck: Date.now() };
+    return false;
+  }
+}
+
 // Get auth token from localStorage
 function getAuthToken(): string | null {
   try {
@@ -24,6 +48,11 @@ async function apiFetch<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
+  // Quick check if API is likely available
+  if (apiAvailabilityCache && !apiAvailabilityCache.available) {
+    throw new Error('API_UNAVAILABLE');
+  }
+
   const token = getAuthToken();
   
   const headers: HeadersInit = {
@@ -35,17 +64,28 @@ async function apiFetch<T = any>(
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const url = `${API_BASE_URL}${endpoint}`;
   
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || error.message || 'Request failed');
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      signal: AbortSignal.timeout(10000) // 10 second timeout
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Request failed' }));
+      throw new Error(error.error || error.message || 'Request failed');
+    }
+    
+    return response.json();
+  } catch (error: any) {
+    // Mark API as unavailable on network errors
+    if (error.name === 'TypeError' || error.name === 'AbortError') {
+      apiAvailabilityCache = { available: false, lastCheck: Date.now() };
+    }
+    throw error;
   }
-  
-  return response.json();
 }
 
 // =============================================
@@ -152,6 +192,16 @@ export async function fetchSettings() {
   return { data: data.settings, error: null };
 }
 
+export async function fetchSettingByKey(category: string, key: string) {
+  try {
+    const data = await apiFetch<{ setting: any }>(`/settings/${category}/${key}`);
+    return { data: data.setting, error: null };
+  } catch (error) {
+    // Silently fail and return null - fallback will handle mock data
+    return { data: null, error };
+  }
+}
+
 export async function updateSetting(category: string, key: string, value: string) {
   const data = await apiFetch<{ setting: any }>('/settings', {
     method: 'PUT',
@@ -179,6 +229,34 @@ export async function createActivityLog(logData: any) {
     body: JSON.stringify(logData),
   });
   return { data: data.log, error: null };
+}
+
+// =============================================
+// MENU PAGES
+// =============================================
+
+export async function fetchMenuPages() {
+  try {
+    const data = await apiFetch<{ pages: any[] }>('/menu-pages');
+    return { data: data.pages, error: null };
+  } catch (error) {
+    // Silently fail and return empty array - fallback will handle mock data
+    return { data: [], error };
+  }
+}
+
+// =============================================
+// AUTH USERS
+// =============================================
+
+export async function fetchAuthUsers() {
+  try {
+    const data = await apiFetch<{ users: any[] }>('/auth/users');
+    return { data: data.users, error: null };
+  } catch (error) {
+    // Silently fail and return empty array - fallback will handle mock data
+    return { data: [], error };
+  }
 }
 
 // =============================================
@@ -272,9 +350,12 @@ const api = {
   fetchCustomers,
   createCustomer,
   fetchSettings,
+  fetchSettingByKey,
   updateSetting,
   fetchActivityLogs,
   createActivityLog,
+  fetchMenuPages,
+  fetchAuthUsers,
   signUp,
   signIn,
   signOut,

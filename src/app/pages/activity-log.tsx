@@ -26,7 +26,6 @@ import { Card } from '../components/ui/card';
 import { getCurrentUser } from '../lib/auth';
 import { CustomModal } from '../components/custom-modal';
 import { fetchActivityLogs, deleteActivityLogs } from '../../lib/supabaseData';
-import { checkConnection } from '../../lib/connectionStatus';
 
 // App version - keep consistent across all modules
 const APP_VERSION = '3.0';
@@ -75,7 +74,7 @@ export function ActivityLog() {
   // Load activity logs from Supabase
   useEffect(() => {
     const loadActivityLogs = async () => {
-      if (!checkConnection()) {
+      if (!navigator.onLine) {
         console.warn('No internet connection. Cannot load activity logs.');
         return;
       }
@@ -139,7 +138,7 @@ export function ActivityLog() {
 
   // Clear all logs from Supabase
   const handleClearLogs = () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot clear logs while offline. Please check your internet connection.');
       return;
     }

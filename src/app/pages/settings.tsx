@@ -58,8 +58,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Header } from '../components/header';
 import { getCurrentUser } from '../lib/auth';
 import { DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from '/src/lib/supabase';
-import { checkConnection } from '../../lib/connectionStatus';
-import { ConnectionStatusBanner } from '../components/connection-status';
 import {
   fetchCustomers,
   fetchActivityLogs,
@@ -272,12 +270,12 @@ export function Settings() {
   });
   const [messageRecipients, setMessageRecipients] = useState('everyone');
   const [customMessage, setCustomMessage] = useState('');
-  const [isOnline, setIsOnline] = useState(checkConnection());
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // Load settings from Supabase
   useEffect(() => {
     const loadAllSettings = async () => {
-      if (!checkConnection()) {
+      if (!navigator.onLine) {
         console.warn('No internet connection. Settings cannot be loaded.');
         return;
       }
@@ -342,7 +340,7 @@ export function Settings() {
 
     // Monitor connection status
     const intervalId = setInterval(() => {
-      setIsOnline(checkConnection());
+      setIsOnline(navigator.onLine);
     }, 5000);
 
     return () => clearInterval(intervalId);
@@ -350,7 +348,7 @@ export function Settings() {
 
   // Log Activity
   const logActivity = async (action: string, details: string) => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       console.warn('Cannot log activity - no internet connection');
       return;
     }
@@ -368,7 +366,7 @@ export function Settings() {
 
   // Save General Settings
   const handleSaveGeneralSettings = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot save settings while offline. Please check your internet connection.');
       return;
     }
@@ -402,7 +400,7 @@ export function Settings() {
 
   // Save Home Page Settings
   const handleSaveHomePageSettings = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot save settings while offline. Please check your internet connection.');
       return;
     }
@@ -584,7 +582,7 @@ export function Settings() {
 
   // User Management
   const handleAddUser = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot add user while offline. Please check your internet connection.');
       return;
     }
@@ -617,7 +615,7 @@ export function Settings() {
   };
 
   const handleUpdateUser = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot update user while offline. Please check your internet connection.');
       return;
     }
@@ -657,7 +655,7 @@ export function Settings() {
 
   // Database Management
   const handleExportDatabase = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot export database while offline. Please check your internet connection.');
       return;
     }
@@ -725,7 +723,7 @@ export function Settings() {
   };
 
   const handleImportDatabase = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot import database while offline. Please check your internet connection.');
       return;
     }
@@ -814,7 +812,7 @@ export function Settings() {
 
   // Copy Database Query
   const handleCopyDatabaseQuery = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot copy database while offline. Please check your internet connection.');
       return;
     }
@@ -869,7 +867,7 @@ export function Settings() {
 
   // Data Management Functions
   const handleClearProperties = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot clear properties while offline. Please check your internet connection.');
       return;
     }
@@ -894,7 +892,7 @@ export function Settings() {
   };
 
   const handleClearCustomers = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot clear customers while offline. Please check your internet connection.');
       return;
     }
@@ -919,7 +917,7 @@ export function Settings() {
   };
 
   const handleClearBookings = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot clear bookings while offline. Please check your internet connection.');
       return;
     }
@@ -944,7 +942,7 @@ export function Settings() {
   };
 
   const handleClearPayments = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot clear payments while offline. Please check your internet connection.');
       return;
     }
@@ -969,7 +967,7 @@ export function Settings() {
   };
 
   const handleClearActivityLogs = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot clear activity logs while offline. Please check your internet connection.');
       return;
     }
@@ -994,7 +992,7 @@ export function Settings() {
   };
 
   const handleResetSystem = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot reset system while offline. Please check your internet connection.');
       return;
     }
@@ -1033,7 +1031,7 @@ export function Settings() {
 
   // Save Notification Settings
   const handleSaveNotificationSettings = async () => {
-    if (!checkConnection()) {
+    if (!navigator.onLine) {
       showModal('error', 'No Connection', 'Cannot save notification settings while offline. Please check your internet connection.');
       return;
     }
@@ -1221,9 +1219,6 @@ export function Settings() {
             </div>
           </div>
         </header>
-
-        {/* Connection Status Banner */}
-        {!isOnline && <ConnectionStatusBanner />}
 
         {/* Settings Content */}
         <main className="flex-1 overflow-auto p-6 bg-gradient-to-br from-[#FAF4EC] via-[#f5ede3] to-[#ebe2d5]">

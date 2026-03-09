@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import Slider from 'react-slick';
 import { fetchProperties, fetchBookings, fetchCustomers, createBooking } from '../../lib/supabaseData';
-import { ConnectionStatusBanner } from '../components/connection-status';
 import { 
   Building2, 
   ChevronLeft,
@@ -18,10 +17,8 @@ import {
   Wifi,
   Car,
   Utensils,
-  Tv,
-  Wind,
-  X,
-  Calendar
+  Calendar,
+  X
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -298,9 +295,7 @@ export function PropertyDetails() {
     const iconMap: { [key: string]: any } = {
       'WiFi': Wifi,
       'Parking': Car,
-      'Kitchen': Utensils,
-      'TV': Tv,
-      'Air Conditioning': Wind
+      'Kitchen': Utensils
     };
     return iconMap[amenity] || Building2;
   };
@@ -544,9 +539,6 @@ export function PropertyDetails() {
 
   return (
     <div className="min-h-screen bg-[#FAF4EC] overflow-x-hidden">
-      {/* Connection Status Banner */}
-      <ConnectionStatusBanner />
-      
       {/* Header */}
       <Header />
 

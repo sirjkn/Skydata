@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
-import { Building2, LogOut, Menu, X, ExternalLink, Home, LayoutDashboard } from 'lucide-react';
+import { Menu, LogOut, Home, LayoutDashboard, Building2, ExternalLink, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { getCurrentUser, logout, isAdmin } from '../lib/auth';
 import { fetchMenuPages } from '../../lib/supabaseData';
-import { ConnectionStatusIndicator } from './connection-status';
 
 export function Header() {
   const navigate = useNavigate();
@@ -119,11 +118,6 @@ export function Header() {
           </nav>
           
           <div className="flex items-center gap-4">
-            {/* Connection Status */}
-            <div className="hidden md:block">
-              <ConnectionStatusIndicator />
-            </div>
-            
             {/* Mobile menu toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
