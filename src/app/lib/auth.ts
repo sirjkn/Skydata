@@ -29,19 +29,19 @@ export async function login(email: string, password: string): Promise<User | nul
     const authUser = await fetchAuthUserByEmail(email);
     
     if (!authUser) {
-      console.error('User not found');
+      // Silently return null - user doesn't exist or wrong credentials
       return null;
     }
 
     // Verify password (in production, use bcrypt comparison)
     if (authUser.password !== password) {
-      console.error('Invalid password');
+      // Silently return null - invalid password
       return null;
     }
 
     // Check if user is active
     if (!authUser.is_active) {
-      console.error('User account is inactive');
+      // Silently return null - inactive account
       return null;
     }
 
@@ -68,7 +68,7 @@ export async function login(email: string, password: string): Promise<User | nul
     console.log('✅ Login successful:', user.name, '(' + user.role + ')');
     return user;
   } catch (error) {
-    console.error('Login error:', error);
+    // Silently handle login errors
     return null;
   }
 }

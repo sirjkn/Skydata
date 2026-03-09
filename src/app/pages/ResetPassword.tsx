@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 
 export default function ResetPassword() {
-  const [email, setEmail] = useState('admin@skywaysuites.com');
+  const [email, setEmail] = useState('admin@skywaysuites.co.ke');
   const [newPassword, setNewPassword] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');

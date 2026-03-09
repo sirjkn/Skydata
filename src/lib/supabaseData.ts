@@ -826,8 +826,7 @@ export async function fetchSettingByKey(category: string, key: string): Promise<
     const result = await api.fetchSettingByKey(category, key);
     return result.data;
   } catch (error) {
-    console.error('Error fetching setting from Neon API, trying legacy database fallback:', error);
-    // Fallback to legacy database if API fails
+    // Silently fall back to legacy database or return null
     try {
       if (!navigator.onLine) return null;
       const supabase = getClient();
@@ -841,7 +840,7 @@ export async function fetchSettingByKey(category: string, key: string): Promise<
       if (supabaseError) throw supabaseError;
       return data;
     } catch (fallbackError) {
-      console.error('Error fetching setting from legacy database:', fallbackError);
+      // Silently return null if both attempts fail
       return null;
     }
   }

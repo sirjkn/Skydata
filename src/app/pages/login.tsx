@@ -43,7 +43,7 @@ export function Login() {
       } else {
         setError('An error occurred during login. Please try again.');
       }
-      console.error('Login error:', error);
+      // Silently handle error - no console logging
     } finally {
       setLoading(false);
     }
@@ -139,6 +139,16 @@ export function Login() {
                   {loading ? 'Signing in...' : 'Sign In'}
                 </Button>
               </form>
+
+              {/* Development Mode Test Credentials */}
+              <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                <p className="text-xs font-semibold text-blue-900 mb-2">🔧 Development Mode - Test Credentials:</p>
+                <div className="text-xs text-blue-800 space-y-1">
+                  <p><strong>Admin:</strong> admin@skywaysuites.co.ke / admin123</p>
+                  <p><strong>Manager:</strong> manager@skywaysuites.co.ke / manager123</p>
+                  <p><strong>Customer:</strong> customer@example.com / customer123</p>
+                </div>
+              </div>
 
               <div className="mt-6 text-center">
                 <Button

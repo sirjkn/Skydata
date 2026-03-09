@@ -80,7 +80,7 @@ async function checkSupabaseConnection(): Promise<boolean> {
     
     return !error;
   } catch (error) {
-    console.error('Supabase connection check failed:', error);
+    // Silently handle - connection checks shouldn't spam console
     return false;
   }
 }

@@ -38,7 +38,8 @@ function getAuthToken(): string | null {
       return parsed.token;
     }
   } catch (error) {
-    console.error('Error getting auth token:', error);
+    // Silently handle - token errors shouldn't spam console
+    return null;
   }
   return null;
 }
@@ -314,7 +315,8 @@ export function getCurrentUser() {
       return parsed.user;
     }
   } catch (error) {
-    console.error('Error getting current user:', error);
+    // Silently handle - auth errors shouldn't spam console
+    return null;
   }
   return null;
 }

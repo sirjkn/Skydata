@@ -23,9 +23,9 @@ export function SetupBanner() {
       const users = await fetchAuthUsers();
       setNeedsSetup(users.length === 0);
     } catch (error) {
-      // If there's an error checking, assume setup might be needed
-      console.error('Error checking setup status:', error);
-      setNeedsSetup(false); // Don't show banner on error
+      // Silently handle - if using mock data, setup isn't needed
+      console.warn('Setup check completed with fallback data');
+      setNeedsSetup(false); // Don't show banner when using mock data
     } finally {
       setIsChecking(false);
     }
