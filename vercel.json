@@ -11,12 +11,5 @@
       "src": "/api/(.*)",
       "dest": "/api/index.ts"
     }
-  ],
-  "env": {
-    "NEON_DATABASE_URL": "@neon_database_url",
-    "JWT_SECRET": "@jwt_secret",
-    "CLOUDINARY_CLOUD_NAME": "@cloudinary_cloud_name",
-    "CLOUDINARY_API_KEY": "@cloudinary_api_key",
-    "CLOUDINARY_API_SECRET": "@cloudinary_api_secret"
-  }
+  ]
 }
