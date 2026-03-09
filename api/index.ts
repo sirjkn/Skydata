@@ -114,12 +114,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   
   const { method, url } = req;
-  const path = url?.split('?')[0] || '';
+  // Vercel strips /api prefix, so we normalize the path
+  let path = url?.split('?')[0] || '';
+  if (!path.startsWith('/api')) {
+    path = '/api' + path;
+  }
   
   try {
     // ===== HEALTH CHECK =====
     if (path === '/api/health' && method === 'GET') {
       return res.status(200).json({ status: 'ok', database: 'neon', storage: 'cloudinary' });
+    }
+    
+    // ===== DEBUG ENDPOINT (Remove after testing) =====
+    if (path === '/api/debug' && method === 'GET') {
+      return res.status(200).json({
+        env_loaded: {
+          NEON_DATABASE_URL: !!process.env.NEON_DATABASE_URL,
+          JWT_SECRET: !!process.env.JWT_SECRET,
+          CLOUDINARY_CLOUD_NAME: !!process.env.CLOUDINARY_CLOUD_NAME,
+          CLOUDINARY_API_KEY: !!process.env.CLOUDINARY_API_KEY,
+          CLOUDINARY_API_SECRET: !!process.env.CLOUDINARY_API_SECRET,
+        },
+        neon_url_first_20_chars: process.env.NEON_DATABASE_URL?.substring(0, 20) || 'NOT SET',
+      });
     }
     
     // ===== AUTH ROUTES =====
