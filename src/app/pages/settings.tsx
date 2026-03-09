@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
+import { NotificationsTabContent } from '../components/notifications-tab';
 import { 
   ArrowLeft,
   Building2,
@@ -74,7 +75,8 @@ import {
 } from '../../lib/supabaseData';
 import * as settingsHelpers from '../lib/settingsHelpers';
 
-type SettingsTab = 'general' | 'homepage' | 'users' | 'database' | 'sms';
+type SettingsTab = 'general' | 'homepage' | 'users' | 'database' | 'notifications';
+type NotificationTab = 'sms' | 'whatsapp' | 'email';
 
 const APP_VERSION = '3.0.3';
 
@@ -87,6 +89,7 @@ export function Settings() {
   const tabFromUrl = urlParams.get('tab') as SettingsTab | null;
   
   const [activeTab, setActiveTab] = useState<SettingsTab>(tabFromUrl || 'general');
+  const [activeNotificationTab, setActiveNotificationTab] = useState<NotificationTab>('sms');
   
   // Activity Log State
   const [showActivityLog, setShowActivityLog] = useState(false);
@@ -233,7 +236,7 @@ export function Settings() {
   const [connectionError, setConnectionError] = useState('');
   const [showErrorPopup, setShowErrorPopup] = useState(false);
 
-  // SMS Settings States
+  // Notification Settings States
   const [smsProvider, setSmsProvider] = useState('africastalking');
   const [africastalkingSettings, setAfricastalkingSettings] = useState({
     apiKey: '',
@@ -244,6 +247,23 @@ export function Settings() {
     accountSid: '',
     authToken: '',
     phoneNumber: ''
+  });
+  const [whatsappSettings, setWhatsappSettings] = useState({
+    enabled: false,
+    apiKey: '',
+    apiUrl: 'https://api.wasenderapi.com',
+    adminPhone: ''
+  });
+  const [emailSettings, setEmailSettings] = useState({
+    enabled: false,
+    provider: 'smtp',
+    smtpHost: '',
+    smtpPort: '587',
+    smtpUser: '',
+    smtpPassword: '',
+    fromEmail: '',
+    fromName: 'Skyway Suites',
+    adminEmail: ''
   });
   const [defaultMessages, setDefaultMessages] = useState({
     bookingMadeAdmin: 'New booking made! Visit system to approve and confirm payment.',
@@ -294,12 +314,14 @@ export function Settings() {
         }));
         setUsers(formattedUsers);
 
-        // Load SMS settings
-        const smsSettingsData = await settingsHelpers.getSmsSettings();
-        setSmsProvider(smsSettingsData.provider || 'africastalking');
-        setAfricastalkingSettings(smsSettingsData.africastalking || africastalkingSettings);
-        setTwilioSettings(smsSettingsData.twilio || twilioSettings);
-        setDefaultMessages(smsSettingsData.defaultMessages || defaultMessages);
+        // Load Notification settings
+        const notificationSettingsData = await settingsHelpers.getNotificationSettings();
+        setSmsProvider(notificationSettingsData.sms?.provider || 'africastalking');
+        setAfricastalkingSettings(notificationSettingsData.sms?.africastalking || africastalkingSettings);
+        setTwilioSettings(notificationSettingsData.sms?.twilio || twilioSettings);
+        setWhatsappSettings(notificationSettingsData.whatsapp || whatsappSettings);
+        setEmailSettings(notificationSettingsData.email || emailSettings);
+        setDefaultMessages(notificationSettingsData.defaultMessages || defaultMessages);
 
         // Load activity logs
         const logsData = await fetchActivityLogs(100);
@@ -667,10 +689,14 @@ export function Settings() {
         settings: {
           general: generalSettings,
           homepage: homePageSettings,
-          sms: {
-            provider: smsProvider,
-            africastalking: africastalkingSettings,
-            twilio: twilioSettings,
+          notifications: {
+            sms: {
+              provider: smsProvider,
+              africastalking: africastalkingSettings,
+              twilio: twilioSettings
+            },
+            whatsapp: whatsappSettings,
+            email: emailSettings,
             defaultMessages: defaultMessages
           }
         },
@@ -738,8 +764,27 @@ export function Settings() {
                 await settingsHelpers.saveHomePageSettings(data.settings.homepage);
                 setHomePageSettings(data.settings.homepage);
               }
-              if (data.settings?.sms) {
-                await settingsHelpers.saveSmsSettings(data.settings.sms);
+              if (data.settings?.notifications) {
+                await settingsHelpers.saveNotificationSettings(data.settings.notifications);
+                setSmsProvider(data.settings.notifications.sms?.provider || 'africastalking');
+                setAfricastalkingSettings(data.settings.notifications.sms?.africastalking || africastalkingSettings);
+                setTwilioSettings(data.settings.notifications.sms?.twilio || twilioSettings);
+                setWhatsappSettings(data.settings.notifications.whatsapp || whatsappSettings);
+                setEmailSettings(data.settings.notifications.email || emailSettings);
+                setDefaultMessages(data.settings.notifications.defaultMessages || defaultMessages);
+              } else if (data.settings?.sms) {
+                // Backward compatibility with old SMS format
+                const notificationSettings = {
+                  sms: {
+                    provider: data.settings.sms.provider,
+                    africastalking: data.settings.sms.africastalking,
+                    twilio: data.settings.sms.twilio
+                  },
+                  whatsapp: whatsappSettings,
+                  email: emailSettings,
+                  defaultMessages: data.settings.sms.defaultMessages
+                };
+                await settingsHelpers.saveNotificationSettings(notificationSettings);
                 setSmsProvider(data.settings.sms.provider);
                 setAfricastalkingSettings(data.settings.sms.africastalking);
                 setTwilioSettings(data.settings.sms.twilio);
@@ -986,27 +1031,31 @@ export function Settings() {
     );
   };
 
-  // Save SMS Settings
-  const handleSaveSmsSettings = async () => {
+  // Save Notification Settings
+  const handleSaveNotificationSettings = async () => {
     if (!checkConnection()) {
-      showModal('error', 'No Connection', 'Cannot save SMS settings while offline. Please check your internet connection.');
+      showModal('error', 'No Connection', 'Cannot save notification settings while offline. Please check your internet connection.');
       return;
     }
 
     try {
-      const smsSettings = {
-        provider: smsProvider,
-        africastalking: africastalkingSettings,
-        twilio: twilioSettings,
+      const notificationSettings = {
+        sms: {
+          provider: smsProvider,
+          africastalking: africastalkingSettings,
+          twilio: twilioSettings
+        },
+        whatsapp: whatsappSettings,
+        email: emailSettings,
         defaultMessages: defaultMessages
       };
       
-      await settingsHelpers.saveSmsSettings(smsSettings);
-      await logActivity('Settings Updated', 'SMS settings saved to cloud');
-      showModal('success', 'Settings Saved', 'SMS settings saved successfully to the cloud!');
+      await settingsHelpers.saveNotificationSettings(notificationSettings);
+      await logActivity('Settings Updated', 'Notification settings saved to cloud');
+      showModal('success', 'Settings Saved', 'Notification settings saved successfully to the cloud!');
     } catch (error) {
-      console.error('Error saving SMS settings:', error);
-      showModal('error', 'Error', 'Failed to save SMS settings. Please try again.');
+      console.error('Error saving notification settings:', error);
+      showModal('error', 'Error', 'Failed to save notification settings. Please try again.');
     }
   };
 
@@ -1038,7 +1087,7 @@ export function Settings() {
     { id: 'homepage', label: 'Home Page', icon: Home },
     { id: 'users', label: 'Users', icon: Users },
     { id: 'database', label: 'Database', icon: Database },
-    { id: 'sms', label: 'SMS', icon: MessageSquare }
+    { id: 'notifications', label: 'Notifications', icon: MessageSquare }
   ];
 
   const currentTabData = tabs.find(t => t.id === activeTab);
@@ -2066,150 +2115,69 @@ export function Settings() {
               </div>
             )}
 
-            {/* SMS Tab */}
-            {activeTab === 'sms' && (
+            {/* Notifications Tab */}
+            {activeTab === 'notifications' && (
               <div className="space-y-6">
-                {/* SMS Provider Card */}
+                {/* Notification Tabs */}
                 <div className="bg-white rounded-2xl shadow-lg border border-[#36454F]/10 overflow-hidden">
                   <div className="p-6 bg-[#FAF4EC] border-b border-[#36454F]/10">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 mb-4">
                       <div className="w-10 h-10 rounded-xl bg-[#6B7F39] flex items-center justify-center">
                         <MessageSquare className="w-5 h-5 text-white" />
                       </div>
-                      <h3 className="text-xl font-bold text-[#36454F]">SMS Provider</h3>
+                      <h3 className="text-xl font-bold text-[#36454F]">Notification Settings</h3>
+                    </div>
+                    
+                    {/* Sub-tabs for SMS, WhatsApp, Email */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setActiveNotificationTab('sms')}
+                        className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                          activeNotificationTab === 'sms'
+                            ? 'bg-[#6B7F39] text-white shadow-lg'
+                            : 'bg-white text-[#36454F] hover:bg-gray-50 border-2 border-gray-200'
+                        }`}
+                      >
+                        SMS
+                      </button>
+                      <button
+                        onClick={() => setActiveNotificationTab('whatsapp')}
+                        className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                          activeNotificationTab === 'whatsapp'
+                            ? 'bg-[#6B7F39] text-white shadow-lg'
+                            : 'bg-white text-[#36454F] hover:bg-gray-50 border-2 border-gray-200'
+                        }`}
+                      >
+                        WhatsApp
+                      </button>
+                      <button
+                        onClick={() => setActiveNotificationTab('email')}
+                        className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                          activeNotificationTab === 'email'
+                            ? 'bg-[#6B7F39] text-white shadow-lg'
+                            : 'bg-white text-[#36454F] hover:bg-gray-50 border-2 border-gray-200'
+                        }`}
+                      >
+                        Email
+                      </button>
                     </div>
                   </div>
                   <div className="p-6 space-y-6">
-                    {/* Provider Selection */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-[#36454F]">Select SMS Provider</label>
-                      <Select
-                        value={smsProvider}
-                        onValueChange={setSmsProvider}
-                      >
-                        <SelectTrigger className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="africastalking">Africa's Talking</SelectItem>
-                          <SelectItem value="twilio">Twilio</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Africa's Talking Settings */}
-                    {smsProvider === 'africastalking' && (
-                      <div className="space-y-4 bg-[#FAF4EC] rounded-xl p-6 border border-[#36454F]/10">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-[#6B7F39] flex items-center justify-center">
-                            <MessageSquare className="w-4 h-4 text-white" />
-                          </div>
-                          <h4 className="font-bold text-[#36454F]">Africa's Talking Settings</h4>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
-                              <Shield className="w-4 h-4 text-[#6B7F39]" />
-                              API Key
-                            </label>
-                            <Input
-                              type="password"
-                              value={africastalkingSettings.apiKey}
-                              onChange={(e) => setAfricastalkingSettings({...africastalkingSettings, apiKey: e.target.value})}
-                              placeholder="Enter API key"
-                              className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12 bg-white"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
-                              <UserCog className="w-4 h-4 text-[#6B7F39]" />
-                              Username
-                            </label>
-                            <Input
-                              value={africastalkingSettings.username}
-                              onChange={(e) => setAfricastalkingSettings({...africastalkingSettings, username: e.target.value})}
-                              placeholder="Enter username"
-                              className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12 bg-white"
-                            />
-                          </div>
-                          <div className="space-y-2 col-span-2">
-                            <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
-                              <Phone className="w-4 h-4 text-[#6B7F39]" />
-                              Shortcode
-                            </label>
-                            <Input
-                              value={africastalkingSettings.shortcode}
-                              onChange={(e) => setAfricastalkingSettings({...africastalkingSettings, shortcode: e.target.value})}
-                              placeholder="Enter shortcode"
-                              className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12 bg-white"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Twilio Settings */}
-                    {smsProvider === 'twilio' && (
-                      <div className="space-y-4 bg-[#FAF4EC] rounded-xl p-6 border border-[#36454F]/10">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-[#6B7F39] flex items-center justify-center">
-                            <MessageSquare className="w-4 h-4 text-white" />
-                          </div>
-                          <h4 className="font-bold text-[#36454F]">Twilio Settings</h4>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
-                              <Shield className="w-4 h-4 text-[#6B7F39]" />
-                              Account SID
-                            </label>
-                            <Input
-                              value={twilioSettings.accountSid}
-                              onChange={(e) => setTwilioSettings({...twilioSettings, accountSid: e.target.value})}
-                              placeholder="Enter Account SID"
-                              className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12 bg-white"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
-                              <Shield className="w-4 h-4 text-[#6B7F39]" />
-                              Auth Token
-                            </label>
-                            <Input
-                              type="password"
-                              value={twilioSettings.authToken}
-                              onChange={(e) => setTwilioSettings({...twilioSettings, authToken: e.target.value})}
-                              placeholder="Enter Auth Token"
-                              className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12 bg-white"
-                            />
-                          </div>
-                          <div className="space-y-2 col-span-2">
-                            <label className="flex items-center gap-2 text-sm font-semibold text-[#36454F]">
-                              <Phone className="w-4 h-4 text-[#6B7F39]" />
-                              Phone Number
-                            </label>
-                            <Input
-                              value={twilioSettings.phoneNumber}
-                              onChange={(e) => setTwilioSettings({...twilioSettings, phoneNumber: e.target.value})}
-                              placeholder="+1234567890"
-                              className="border-2 border-gray-200 focus:border-[#6B7F39] rounded-xl h-12 bg-white"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Save Button */}
-                    <div className="pt-4 border-t border-[#36454F]/10">
-                      <Button 
-                        onClick={handleSaveSmsSettings}
-                        className="w-full md:w-auto bg-[#6B7F39] hover:bg-[#5a6930] text-white font-semibold py-6 px-8 rounded-xl shadow-lg"
-                        disabled={!isOnline}
-                      >
-                        <Save className="w-5 h-5 mr-2" />
-                        Save SMS Settings
-                      </Button>
-                    </div>
+                    <NotificationsTabContent
+                      activeTab={activeNotificationTab}
+                      smsProvider={smsProvider}
+                      setSmsProvider={setSmsProvider}
+                      africastalkingSettings={africastalkingSettings}
+                      setAfricastalkingSettings={setAfricastalkingSettings}
+                      twilioSettings={twilioSettings}
+                      setTwilioSettings={setTwilioSettings}
+                      whatsappSettings={whatsappSettings}
+                      setWhatsappSettings={setWhatsappSettings}
+                      emailSettings={emailSettings}
+                      setEmailSettings={setEmailSettings}
+                      onSave={handleSaveNotificationSettings}
+                      isOnline={isOnline}
+                    />
                   </div>
                 </div>
               </div>

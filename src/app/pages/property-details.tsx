@@ -450,6 +450,56 @@ export function PropertyDetails() {
       console.log('- Check-in:', createdBooking.check_in_date, '| Check-out:', createdBooking.check_out_date);
       console.log('- Days:', calculatedDays, '| Total Amount: KSh', calculatedAmount.toLocaleString());
       
+      // Send notifications (SMS, WhatsApp, Email)
+      try {
+        const { getNotificationSettings } = await import('../lib/settingsHelpers');
+        const notificationSettings = await getNotificationSettings();
+        const { projectId, publicAnonKey } = await import('/utils/supabase/info');
+        
+        // Prepare notification data
+        const notificationData = {
+          notificationSettings,
+          bookingData: {
+            bookingReference: `BK${createdBooking.booking_id}`,
+            checkIn: bookingForm.checkIn,
+            checkOut: bookingForm.checkOut,
+            totalAmount: calculatedAmount,
+            status: createdBooking.booking_status
+          },
+          propertyData: {
+            name: bookingForm.propertyName
+          },
+          customerData: {
+            name: bookingForm.customerName,
+            phone: bookingForm.customerPhone,
+            email: bookingForm.customerEmail
+          }
+        };
+        
+        // Call notification endpoint
+        const notificationResponse = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-6a712830/notifications/booking`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${publicAnonKey}`
+            },
+            body: JSON.stringify(notificationData)
+          }
+        );
+        
+        if (notificationResponse.ok) {
+          const notificationResult = await notificationResponse.json();
+          console.log('📧 Notifications sent successfully:', notificationResult);
+        } else {
+          console.warn('⚠️ Failed to send notifications:', await notificationResponse.text());
+        }
+      } catch (notifError) {
+        console.warn('⚠️ Notification error (non-critical):', notifError);
+        // Don't fail the booking if notifications fail
+      }
+      
       // Show success modal with booking details
       showModal(
       'success', 

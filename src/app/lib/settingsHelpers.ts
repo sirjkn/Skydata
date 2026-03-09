@@ -108,31 +108,50 @@ export async function saveHomePageSettings(settings: any) {
 }
 
 // ============================================================================
-// SMS SETTINGS HELPERS
+// NOTIFICATION SETTINGS HELPERS (SMS, WhatsApp, Email)
 // ============================================================================
 
-export async function getSmsSettings() {
+export async function getNotificationSettings() {
   try {
-    const setting = await fetchSettingByKey('sms', 'config');
+    const setting = await fetchSettingByKey('notifications', 'config');
     if (setting && setting.setting_value) {
       return JSON.parse(setting.setting_value);
     }
   } catch (error) {
-    console.error('Error fetching SMS settings:', error);
+    console.error('Error fetching notification settings:', error);
   }
   
   // Return defaults if not found
   return {
-    provider: 'africastalking',
-    africastalking: {
-      apiKey: '',
-      username: '',
-      shortcode: ''
+    sms: {
+      provider: 'africastalking',
+      africastalking: {
+        apiKey: '',
+        username: '',
+        shortcode: ''
+      },
+      twilio: {
+        accountSid: '',
+        authToken: '',
+        phoneNumber: ''
+      }
     },
-    twilio: {
-      accountSid: '',
-      authToken: '',
-      phoneNumber: ''
+    whatsapp: {
+      enabled: false,
+      apiKey: '',
+      apiUrl: 'https://api.wasenderapi.com',
+      adminPhone: ''
+    },
+    email: {
+      enabled: false,
+      provider: 'smtp',
+      smtpHost: '',
+      smtpPort: '587',
+      smtpUser: '',
+      smtpPassword: '',
+      fromEmail: '',
+      fromName: 'Skyway Suites',
+      adminEmail: ''
     },
     defaultMessages: {
       bookingMadeAdmin: 'New booking made! Visit system to approve and confirm payment.',
@@ -142,6 +161,28 @@ export async function getSmsSettings() {
   };
 }
 
+export async function saveNotificationSettings(settings: any) {
+  await upsertSetting('notifications', 'config', JSON.stringify(settings), 'json');
+}
+
+// Backward compatibility - deprecated
+export async function getSmsSettings() {
+  const notifSettings = await getNotificationSettings();
+  return {
+    provider: notifSettings.sms.provider,
+    africastalking: notifSettings.sms.africastalking,
+    twilio: notifSettings.sms.twilio,
+    defaultMessages: notifSettings.defaultMessages
+  };
+}
+
 export async function saveSmsSettings(settings: any) {
-  await upsertSetting('sms', 'config', JSON.stringify(settings), 'json');
+  const notifSettings = await getNotificationSettings();
+  notifSettings.sms = {
+    provider: settings.provider,
+    africastalking: settings.africastalking,
+    twilio: settings.twilio
+  };
+  notifSettings.defaultMessages = settings.defaultMessages;
+  await saveNotificationSettings(notifSettings);
 }

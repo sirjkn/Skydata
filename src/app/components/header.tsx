@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import { Building2, LogOut, Menu, X, ExternalLink, Home } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router';
+import { Building2, LogOut, Menu, X, ExternalLink, Home, LayoutDashboard } from 'lucide-react';
 import { Button } from './ui/button';
 import { getCurrentUser, logout, isAdmin } from '../lib/auth';
 import { fetchMenuPages } from '../../lib/supabaseData';
@@ -8,9 +8,13 @@ import { ConnectionStatusIndicator } from './connection-status';
 
 export function Header() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(getCurrentUser());
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Check if user is on dashboard page
+  const isOnDashboard = location.pathname.startsWith('/admin');
 
   useEffect(() => {
     // Update user state when auth changes
@@ -121,14 +125,12 @@ export function Header() {
             </div>
             
             {/* Mobile menu toggle */}
-            {menuItems.length > 0 && (
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden text-white hover:text-[#6B7F39]"
-              >
-                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </button>
-            )}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden text-white hover:text-[#6B7F39]"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
 
             {user ? (
               <>
@@ -149,20 +151,42 @@ export function Header() {
                   <p className="text-xs text-gray-300">{user.email}</p>
                 </div>
                 
-                {/* Mobile: Back Home Button */}
-                <Button
-                  onClick={() => navigate('/')}
-                  variant="outline"
-                  className="md:hidden border-white text-black bg-white hover:bg-gray-100"
-                >
-                  <Home className="w-4 h-4 mr-2" />
-                  <span>Home</span>
-                </Button>
+                {/* Mobile: Context-aware button for admins, always show Home for non-admins */}
+                {isAdmin(user) ? (
+                  isOnDashboard ? (
+                    <Button
+                      onClick={() => navigate('/')}
+                      variant="outline"
+                      className="md:hidden border-white text-black bg-white hover:bg-gray-100"
+                    >
+                      <Home className="w-4 h-4 mr-2" />
+                      <span>Home</span>
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => navigate('/admin/dashboard')}
+                      variant="outline"
+                      className="md:hidden border-white text-black bg-white hover:bg-gray-100"
+                    >
+                      <LayoutDashboard className="w-4 h-4 mr-2" />
+                      <span>Admin</span>
+                    </Button>
+                  )
+                ) : (
+                  <Button
+                    onClick={() => navigate('/')}
+                    variant="outline"
+                    className="md:hidden border-white text-black bg-white hover:bg-gray-100"
+                  >
+                    <Home className="w-4 h-4 mr-2" />
+                    <span>Home</span>
+                  </Button>
+                )}
                 
                 <Button
                   onClick={handleLogout}
                   variant="outline"
-                  className="border-white text-black bg-white hover:bg-gray-100"
+                  className="hidden md:flex border-white text-black bg-white hover:bg-gray-100"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
                   <span className="hidden sm:inline">Logout</span>
@@ -173,13 +197,13 @@ export function Header() {
                 <Button
                   onClick={() => navigate('/login')}
                   variant="outline"
-                  className="border-white text-black bg-white hover:bg-gray-100"
+                  className="hidden md:flex border-white text-black bg-white hover:bg-gray-100"
                 >
                   Login
                 </Button>
                 <Button
                   onClick={() => navigate('/signup')}
-                  className="bg-[#6B7F39] hover:bg-[#5a6930]"
+                  className="hidden md:flex bg-[#6B7F39] hover:bg-[#5a6930]"
                 >
                   Create Account
                 </Button>
@@ -189,7 +213,7 @@ export function Header() {
         </div>
 
         {/* Mobile Navigation Menu */}
-        {mobileMenuOpen && menuItems.length > 0 && (
+        {mobileMenuOpen && (
           <nav className="lg:hidden mt-4 pt-4 border-t border-gray-600">
             <div className="flex flex-col gap-3">
               {menuItems.map((item) => (
@@ -202,6 +226,44 @@ export function Header() {
                   {item.type === 'external' && <ExternalLink className="w-3 h-3" />}
                 </button>
               ))}
+              
+              {/* Add Login and Create Account as menu items for mobile when not logged in */}
+              {!user && (
+                <>
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      navigate('/login');
+                    }}
+                    className="text-white hover:text-[#FAF4EC] transition-colors font-medium text-left flex items-center gap-2 py-2"
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      navigate('/signup');
+                    }}
+                    className="text-white hover:text-[#FAF4EC] transition-colors font-medium text-left flex items-center gap-2 py-2"
+                  >
+                    Create Account
+                  </button>
+                </>
+              )}
+              
+              {/* Add Logout as menu item for mobile when logged in */}
+              {user && (
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="text-white hover:text-[#FAF4EC] transition-colors font-medium text-left flex items-center gap-2 py-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              )}
             </div>
           </nav>
         )}

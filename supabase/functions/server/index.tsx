@@ -3,6 +3,7 @@ import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import * as kv from "./kv_store.tsx";
+import { sendBookingNotifications } from "./notifications.tsx";
 
 const app = new Hono();
 
@@ -258,6 +259,9 @@ app.post("/make-server-6a712830/bookings", requireAuth, async (c) => {
     
     await kv.set(`booking:${bookingId}`, booking);
     
+    // Send booking notifications
+    await sendBookingNotifications(booking);
+    
     return c.json({ booking });
   } catch (error) {
     console.log('Error creating booking:', error);
@@ -322,6 +326,33 @@ app.post("/make-server-6a712830/inquiries", async (c) => {
   } catch (error) {
     console.log('Error saving inquiry:', error);
     return c.json({ error: 'Failed to save inquiry' }, 500);
+  }
+});
+
+// ===== NOTIFICATION ROUTES =====
+
+// Send booking notifications
+app.post("/make-server-6a712830/notifications/booking", async (c) => {
+  try {
+    const { notificationSettings, bookingData, propertyData, customerData } = await c.req.json();
+    
+    console.log('📧 Sending booking notifications...');
+    console.log('Customer:', customerData.name);
+    console.log('Property:', propertyData.name);
+    
+    const results = await sendBookingNotifications(
+      notificationSettings,
+      bookingData,
+      propertyData,
+      customerData
+    );
+    
+    console.log('📧 Notification results:', JSON.stringify(results, null, 2));
+    
+    return c.json({ success: true, results });
+  } catch (error) {
+    console.error('Error sending notifications:', error);
+    return c.json({ error: 'Failed to send notifications', details: error instanceof Error ? error.message : 'Unknown error' }, 500);
   }
 });
 

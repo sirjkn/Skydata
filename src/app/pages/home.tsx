@@ -279,10 +279,10 @@ export function Home() {
                   alt={slide.title}
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/30 flex items-end pb-8">
+                <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-black/10 flex items-end pb-8">
                   <div className="container mx-auto px-4">
                     <div className="max-w-2xl">
-                      <h2 className="text-base md:text-lg font-bold text-white mb-3">
+                      <h2 className="text-lg md:text-2xl font-bold text-white mb-3">
                         {slide.title}
                       </h2>
                       <p className="text-xs md:text-sm text-gray-200 mb-6">

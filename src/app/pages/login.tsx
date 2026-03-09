@@ -163,16 +163,6 @@ export function Login() {
                     Create Account
                   </button>
                 </p>
-                <p className="text-xs text-gray-500">
-                  First time setup?{' '}
-                  <button
-                    type="button"
-                    onClick={() => navigate('/setup')}
-                    className="text-[#6B7F39] hover:text-[#5a6930] font-semibold underline"
-                  >
-                    Initialize Database
-                  </button>
-                </p>
               </div>
             </CardContent>
           </Card>
